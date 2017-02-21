@@ -219,16 +219,16 @@ def plot_contribPie(station, POtype_list, saveFig=False):
             df      = conc*param.T.iloc[0]
             if (np.sum(df.dropna(axis=1))<0).any():
                 continue
-        ax[i][j].set_aspect('equal')
-        df.sort_index(axis=1,inplace=True)
-        c = sourcesColor()
-        cols = c.ix["color",df.columns].values
-        np.sum(df.dropna(axis=1)).plot.pie(ax=ax[i][j],
-                                           shadow=False,
-                                           startangle=90,
-                                           colors=cols)
-        ax[i][j].set_title(name)
-        ax[i][j].set_ylabel("")
+            ax[i][j].set_aspect('equal')
+            df.sort_index(axis=1,inplace=True)
+            c = sourcesColor()
+            cols = c.ix["color",df.columns].values
+            np.sum(df.dropna(axis=1)).plot.pie(ax=ax[i][j],
+                                               shadow=False,
+                                               startangle=90,
+                                               colors=cols)
+            ax[i][j].set_title(name)
+            ax[i][j].set_ylabel("")
         plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
     if saveFig:
         plt.savefig("figures/coeffAllSites.png")
@@ -245,11 +245,11 @@ fileDirPO   = "/home/samuel/Documents/IGE/BdD_PO/"
 fromSource  = True
 
 
-station_list= ("Passy","Marnaz","Chamonix")
-POtype_list = ["POPerCent"]
+station_list= ("Frenes","Passy","Marnaz","Chamonix")
+POtype_list = ["PODTTm3","POAAm3"]#PerCent"]
 
-plotBool    = False
-saveFig     = False
+plotBool    = True 
+saveFig     = True 
 
 if fromSource:
     BasefileConc= "ContributionsMass.csv"
@@ -328,8 +328,11 @@ for name in station_list:
             ax=plt.subplot(2,3,6)
             ax.set_aspect('equal')
             df = CHEM.ix[:,m.index] * m.T.iloc[0]
+            df.sort_index(axis=1,inplace=True)
+            c = sourcesColor()
+            cols = c.ix["color",df.columns].values
             if (df.sum()>0).all():
-                df.sum().plot.pie(shadow=False, startangle=90)
+                df.sum().plot.pie(shadow=False, startangle=90, colors=cols)
                 ax.set_ylabel("")
 
             plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
