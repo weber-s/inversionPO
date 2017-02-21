@@ -248,7 +248,7 @@ fromSource  = True
 station_list= ("Passy","Marnaz","Chamonix")
 POtype_list = ["POPerCent"]
 
-plotBool    = True
+plotBool    = False
 saveFig     = False
 
 if fromSource:
