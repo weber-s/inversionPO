@@ -231,9 +231,9 @@ def plot_contribPie(station, POtype_list, saveFig=False):
             ax[i][j].set_ylabel("")
         plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
     if saveFig:
-        plt.savefig("figures/coeffAllSites.png")
-        plt.savefig("figures/svg/coeffAllSites.svg")
-        plt.savefig("figures/pdf/coeffAllSites.pdf")
+        plt.savefig("figures/contribAllSites.png")
+        plt.savefig("figures/svg/contribAllSites.svg")
+        plt.savefig("figures/pdf/contribAllSites.pdf")
 
 
 mpl.rcParams.update({'font.size': 12})
@@ -285,6 +285,7 @@ for name in station_list:
 
         if plotBool:
             CHEM= station[name][POtype]["CHEM"]
+            G   = station[name][POtype]["G"]
             PO  = station[name][POtype][POtype]
             model = station[name][POtype]["model"]
             m   = station[name][POtype]["m"]
@@ -327,7 +328,7 @@ for name in station_list:
             # Pie chart
             ax=plt.subplot(2,3,6)
             ax.set_aspect('equal')
-            df = CHEM.ix[:,m.index] * m.T.iloc[0]
+            df = G.ix[:,m.index] * m.T.iloc[0]
             df.sort_index(axis=1,inplace=True)
             c = sourcesColor()
             cols = c.ix["color",df.columns].values
