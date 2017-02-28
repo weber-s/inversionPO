@@ -2,6 +2,13 @@ import pandas as pd
 import numpy as np
 import pulp
 
+class Station:
+    def __init__(self,name=None,CHEM=None,PO=None,m=None):
+        self.name   = name
+        self.CHEM   = CHEM
+        self.PO     = PO
+        self.m      = m
+        self.pie    = pd.concat([pie, pd.Series((CHEM*m).sum(), name=name)],axis=1)
 
 def renameIndex():
     rename={
@@ -34,26 +41,29 @@ def solve_inversion(d, G, std, x_min=None, x_max=None):
         lp_prob += condition, label
         condition = (d[i] - dot_G_x) >= -m - std[i]
         lp_prob += condition, label2
-    lp_prob.writeLP("MinmaxProblem.lp")  # optional
+    #lp_prob.writeLP("MinmaxProblem.lp")  # optional
     lp_prob.solve()
 
     return lp_prob
 
-
+DIR = "/home/samuel/Documents/IGE/BdD_PO/"
 list_name   = ("Passy","Marnaz","Chamonix")
 list_POtype = ("PODTTm3","POAAm3","POPerCent")
 
+sto = dict()
 save = dict()
 savepie = dict()
 for POtype in list_POtype:
+    sto[POtype]=dict()
+    print("=============="+POtype+"====================")
     s = pd.Series()
     pie = pd.Series()
     for name in list_name:
         print("=============="+name+"====================")
-        PO      = pd.read_csv(name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
+        PO      = pd.read_csv(DIR+name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
         POunc   = PO["unc"+POtype]
         PO      = PO[POtype]
-        CHEM    = pd.read_csv(name+"/"+name+"ContributionsMass.csv", index_col="date", parse_dates=["date"], dayfirst=True)   
+        CHEM    = pd.read_csv(DIR+name+"/"+name+"ContributionsMass.csv", index_col="date", parse_dates=["date"], dayfirst=True)   
 
         rowOKPO = PO.T.notnull()
         rowOkV  = CHEM.T.notnull().all()
@@ -79,6 +89,10 @@ for POtype in list_POtype:
         tmp.rename(newname, inplace=True)
         pie = pd.concat([pie, pd.Series((CHEM*tmp).sum(), name=name)],axis=1)
         s   = pd.concat([s,tmp],axis=1)
+        sto[POtype][name] = Station(name=name,
+                                    CHEM=CHEM,
+                                    PO=PO,
+                                    m=tmp)
 
     s.dropna(axis=1, how="all", inplace=True)
     pie.dropna(axis=1, how="all", inplace=True)
