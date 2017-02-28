@@ -420,15 +420,6 @@ for j, row in enumerate(axes):
             ax.yaxis.labelpad = 100
 plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
-#for j, name in enumerate(station_list):
-#    ax[0][j].set_title(name)
-#    for i, POtype in enumerate(POtype_list):
-#        ax[i][0].set_ylabel(POtype)
-#        param   = station[name][POtype]["m"]
-#        conc    = station[name][POtype]["G"]
-#        plot_contribPie(ax[j][i], param, conc)
-#        plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-
 if saveFig:
     plt.savefig("figures/contribAllSites.png")
     plt.savefig("figures/svg/contribAllSites.svg")
