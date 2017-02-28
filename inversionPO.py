@@ -9,37 +9,44 @@ from scipy import polyfit
 import math
 import pandas as pd
 
-def loadData(station_list, POtype_list, BasefileConc, BasefilePOconc, BasefilePOunc):
+def loadData(name, POtype_list, BasefileConc, BasefilePO):
     conc  = {}
     POconc  = {}
     POunc   = {}
-    for name in station_list:
-        fileConc    = os.path.join(fileDirPO,name+"/"+name+BasefileConc)
-        filePOconc  = os.path.join(fileDirPO,name+"/"+name+BasefilePOconc)
-        filePOunc   = os.path.join(fileDirPO,name+"/"+name+BasefilePOunc)
-        try:
-            conc[name]  = pd.read_csv(fileConc,
-                                      index_col="date",
-                                      parse_dates=["date"],
-                                      dayfirst=True)
-            POconc[name]= pd.read_csv(filePOconc,
-                                      index_col="date",
-                                      parse_dates=["date"],
-                                      dayfirst=True)
-            POconc[name]= POconc[name].ix[:,POtype_list]
-            conc[name]  = pd.merge(conc[name], POconc[name], right_index=True,
-                                   left_index=True, how="outer")
-            POunc[name] = pd.read_csv(filePOunc,
-                                      index_col="date",
-                                      parse_dates=["date"],
-                                      dayfirst=True)
-            POunc[name] = POunc[name].ix[:,POtype_list]
-            
-        except FileNotFoundError as e:
-            print("ERROR {station}: {error}.".format(error=str(e), station=name))
-            print("Aborting...")
-            sys.exit()
-    return (conc, POunc)
+    POtype_list_unc = []
+    #for name in station_list:
+        
+    fileConc    = os.path.join(fileDirPO,name+"/"+name+BasefileConc)
+    filePO  = os.path.join(fileDirPO,name+"/"+name+BasefilePO)
+    try:
+        conc  = pd.read_csv(fileConc,
+                            index_col="date",
+                            parse_dates=["date"],
+                            dayfirst=True)
+        POtype_list.append('date')
+        POconc= pd.read_csv(filePO,
+                            index_col="date",
+                            parse_dates=["date"],
+                            dayfirst=True,
+                            usecols=POtype_list)
+        #POconc= POconc.ix[:,POtype_list]
+        conc  = pd.merge(conc, POconc, right_index=True,
+                         left_index=True, how="outer")
+        POtype_list.remove('date')
+        POtype_list_unc[:] = ["unc"+x for x in POtype_list]
+        POtype_list_unc.append('date')
+        POunc = pd.read_csv(filePO,
+                            index_col="date",
+                            parse_dates=["date"],
+                            dayfirst=True,
+                            usecols=POtype_list_unc)
+        #POunc = POunc.ix[:,POtype_list]
+
+    except FileNotFoundError as e:
+        print("ERROR {station}: {error}.".format(error=str(e), station=name))
+        print("Aborting...")
+        sys.exit()
+    return conc, POunc
 
 
 def to_date(strdate):
@@ -116,7 +123,7 @@ def loadCHEM(conc, fromSource, PMother=False, factor2regroup=[]):
             try:
                 All     = ["Sea/road salt","Secondary bio","Primary bio",\
                            "Mineral dust","Débris végétaux", "Chlorure",\
-                           "AOS/dust","Industrial"]
+                           "AOS/dust","Industrial","Nitrate-rich"]
                 Other   = CHEM.ix[:,All]
             except KeyError:
                 pass
@@ -149,16 +156,40 @@ def reversePO(conc, unc, POtype, fromSource):
     #Covd    = np.diag(np.power(POunc[idok],2))
     # ===== Linear inversion
     #m, Covm, Resm= solveLinear(G,d,Covd)
-    CHEM    = loadCHEM(conc, fromSource, PMother=True)
-    POunc   = unc[POtype]
+    colKo   = ["POAAm3","POAAµg","PODTTm3","PODTTµg","POPerCent"]
+    CHEM    = loadCHEM(conc, fromSource, PMother=False)
+    PO      = CHEM[POtype]
+    CHEM.drop(colKo,axis=1,errors="ignore",inplace=True)
+    POunc   = unc["unc"+POtype]
     rowOkV  = CHEM.T.notnull().all()
     rowOkPO = POunc.T.notnull()
     rowOk   = rowOkV & rowOkPO
-    colKo   = ["POAAm3","POAAµg","PODTTm3","PODTTµg","POPerCent"]
+    # check if we actually have data to invert...
+    if sum(rowOk)==0:
+        # ===== Save result in a dictionary
+        station             = {}
+        station["HasPO"]    = False
+        station[POtype]     = conc[POtype]
+        station['CHEM']     = CHEM
+        station['m']        = pd.DataFrame(index=CHEM.columns,
+                                           data=np.ones((len(CHEM.columns),1))*np.nan)
+        station['G']        = pd.DataFrame(index=CHEM.index,
+                                           columns=CHEM.columns,
+                                           data=np.ones(CHEM.shape)*np.nan)
+        #station['model']    = model
+        #station['d']        = d
+        #station['r2']       = r2
+        #station['p']        = p
+        station['Covm']     = pd.DataFrame(index=CHEM.columns,
+                                           data=np.ones((len(CHEM.columns),len(CHEM.columns)))*np.nan)
+        station['Resm']     = np.ones((len(CHEM.columns),len(CHEM.columns)))*np.nan
+        #station['residu']   = residu
+        return station
+
     G       = CHEM.ix[rowOk,:].drop(colKo,
                                     axis=1,
                                     errors="ignore")
-    d       = CHEM.ix[rowOk,POtype]
+    d       = PO.ix[rowOk]
     Covd    = np.diag(np.power(POunc[rowOk],2))
     m, Covm, Resm= solveLinear(G=G.as_matrix(),
                                d=d.as_matrix(),
@@ -172,6 +203,7 @@ def reversePO(conc, unc, POtype, fromSource):
     r2  = pd.concat([d,model],axis=1).corr()
     # ===== Save result in a dictionary
     station             = {}
+    station["HasPO"]    = True
     station[POtype]     = conc[POtype]
     station['CHEM']     = CHEM
     station['m']        = m
@@ -185,7 +217,7 @@ def reversePO(conc, unc, POtype, fromSource):
     station['residu']   = residu
     return station
 
-def plot_station(station, POtype):
+def plot_station(station, POunc, POtype):
     """
     Plot the time series obs & recons, the scatter plot obs/recons, the
     intrinsic PO and the contribution of the sources/species.
@@ -200,6 +232,7 @@ def plot_station(station, POtype):
     plt.figure(figsize=(17,8))
     # time serie reconstruction/observation
     ax=plt.subplot(2,3,(1,3))
+    #PO.plot(style='b-o', yerr=POunc, label="Obs.")
     ax.plot_date(PO.index.to_pydatetime(), PO, "b-o", label="Obs.")
     ax.plot_date(model.index.to_pydatetime(), model, "r-*", label="recons.")
     plt.title("{station} {PO}".format(station=name, PO=POtype))
@@ -225,12 +258,16 @@ def plot_station(station, POtype):
 
     plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
-def plot_coeff(ax, station, POtype_list, fromSource=True):
+def plot_coeff(station, POtype_list, ax=None):
     """Plot a bar plot of the intrinsique PO of the sources for all the station"""
+    if ax==None:
+        ax = plt.subplots(row=len(POtype_list), columns=len(station.keys()))
     for i, POtype in enumerate(POtype_list):
         dfVal = pd.DataFrame()
         dfUnc = pd.DataFrame()
         for name in station.keys():
+            if type(station[name][POtype]) is not type(dict()):
+                continue
             mValtmp = pd.DataFrame(index=station[name][POtype]["G"].columns,
                                    data=station[name][POtype]["m"],
                                    columns=[name])
@@ -252,7 +289,7 @@ def plot_coeff(ax, station, POtype_list, fromSource=True):
             ax[-2].set_xticklabels(l, rotation=0)
 
 
-def plot_contribPie(ax, m, G, title=""):
+def plot_contribPie(ax, m, G, title=None, ylabel=None):
     """
     Plot contributions of the sources to the PO in a Pie chart
     The contributions is G*m.
@@ -270,7 +307,8 @@ def plot_contribPie(ax, m, G, title=""):
                                        shadow=False,
                                        startangle=90,
                                        colors=cols)
-    ax.set_title(title)
+    if title is not None:
+        ax.set_title(title)
     ax.set_ylabel("")
 
 def plot_scatterReconsObs(ax, obs, model, p, r2):
@@ -299,9 +337,9 @@ fileDirPO   = "/home/samuel/Documents/IGE/BdD_PO/"
 fromSource  = True
 
 
-#station_list= ("Frenes","Passy","Marnaz","Chamonix")
+station_list= ("Frenes","Passy","Marnaz","Chamonix")
 #station_list= ("Passy","Marnaz","Chamonix")
-station_list= ("Marnaz",)
+#station_list= ("Marnaz",)
 POtype_list = ["POAAm3", "PODTTm3","POPerCent"]
 #POtype_list = ["POPerCent"]
 
@@ -309,28 +347,33 @@ plotBool    = True
 saveFig     = False
 
 if fromSource:
-    BasefileConc= "ContributionsMass.csv"
-    BasefilePOconc      = "PO_conc.csv"
-    BasefilePOunc       = "PO_unc.csv"
+    BasefileConc= "ContributionsMass_positive.csv"
+    BasefilePO  = "PO.csv"
 else:
     BasefileConc= "PO+CHEM_conc.csv"
-    BasefilePOconc      = "PO_conc.csv"
-    BasefilePOunc       = "PO_unc.csv"
+    BasefilePO  = "PO.csv"
 
 station     = {}
 
+concentrations  = {}
+POuncertainties = {}
 
 # ========= LOAD DATA ========================================================
-concentrations, POunc = loadData(station_list, POtype_list,
-                                         BasefileConc, BasefilePOconc, BasefilePOunc)
+#(concentrations, POunc) = loadData(station_list, POtype_list,
+#                                         BasefileConc, BasefilePO)
 
 # ========= INVERSION ========================================================
 for name in station_list:
+    concentrations[name], POuncertainties[name] = loadData(name, POtype_list,
+                                                 BasefileConc, BasefilePO)
     station[name]   = {}
     for POtype in POtype_list:
         print("\n===== {name} for {PO} =====".format(name=name, PO=POtype))
+        #if concentrations[name][POtype].isnull().all():
+        #    station[name][POtype] = np.nan
+        #    continue
         station[name][POtype] =  reversePO(concentrations[name],
-                                           POunc[name],
+                                           POuncertainties[name],
                                            POtype,
                                            fromSource)
         # plot part ==================================================================
@@ -341,8 +384,8 @@ for name in station_list:
             #    print("%s \t%0.4f\t± %0.4f" % (concentrations[name].keys()[i], x,
             #                                    np.sqrt(concentrations[name].Covm[i,i])))
 
-        if plotBool:
-            plot_station(station[name][POtype], POtype)
+        if plotBool and station[name][POtype]["HasPO"]:
+            plot_station(station[name][POtype], POuncertainties[name]["unc"+POtype], POtype)
             if saveFig:
                 plt.savefig("figures/svg/inversion"+name+POtype+".svg")
                 plt.savefig("figures/pdf/inversion"+name+POtype+".pdf")
@@ -352,7 +395,7 @@ for name in station_list:
 # ========== PLOT COEFFICIENT =================================================
 f, ax = plt.subplots(nrows=len(POtype_list),ncols=1,sharex=True,figsize=(17,8))
 ax    = np.hstack((ax,[''])) #little hack for when len(POtype_list) = 1
-plot_coeff(ax, station, POtype_list, fromSource=fromSource)
+plot_coeff(station, POtype_list, ax=ax)
 if saveFig:
     plt.savefig("figures/coeffAllSites.png")
     plt.savefig("figures/svg/coeffAllSites.svg")
@@ -360,14 +403,31 @@ if saveFig:
 
 
 # ========== CONTRIBUTION PIE CHART ===========================================
-f,ax = plt.subplots(nrows=len(POtype_list),ncols=len(station_list),figsize=(17,8))
-ax.shape = (np.sum(ax.shape),)
-for j, name in enumerate(station_list):
-    for i, POtype in enumerate(POtype_list):
-        param   = station[name][POtype]["m"]
-        conc    = station[name][POtype]["G"]
-        plot_contribPie(ax[i+j], param, conc, title=name)
-        plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+f,axes = plt.subplots(nrows=len(POtype_list),ncols=len(station_list),figsize=(17,8))
+#ax.shape = (np.sum(ax.shape),) 
+for j, row in enumerate(axes):
+    for i, ax in enumerate(row):
+        if j == 0:
+            ax.set_title(station_list[i])
+        if not(station[station_list[i]][POtype_list[j]]["HasPO"]):
+            ax.set_axis_off()
+            continue
+        param   = station[station_list[i]][POtype_list[j]]["m"]
+        conc    = station[station_list[i]][POtype_list[j]]["G"]
+        plot_contribPie(ax, param, conc)
+        if i == 0:
+            ax.set_ylabel(POtype_list[j], {'size': '16'} )
+            ax.yaxis.labelpad = 100
+plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+
+#for j, name in enumerate(station_list):
+#    ax[0][j].set_title(name)
+#    for i, POtype in enumerate(POtype_list):
+#        ax[i][0].set_ylabel(POtype)
+#        param   = station[name][POtype]["m"]
+#        conc    = station[name][POtype]["G"]
+#        plot_contribPie(ax[j][i], param, conc)
+#        plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
 if saveFig:
     plt.savefig("figures/contribAllSites.png")
