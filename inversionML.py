@@ -15,7 +15,7 @@ class Station:
             self.PO     = PO
             self.m      = m
             self.model  = pd.Series((CHEM*m).sum(axis=1), name=name)
-            if (m>0).all():
+            if (m>=0).all():
                 self.pie    = pd.Series((CHEM*m).sum(), name=name)
             else:
                 self.pie=pd.Series(index=CHEM.columns)
@@ -133,7 +133,6 @@ def plot_contribPie(ax, Station, title=None, ylabel=None):
     if fromSource:
         c = sourcesColor()
         cols = c.ix["color",df.index].values
-
         ax.set_aspect('equal')
         df.plot.pie(ax=ax,
                     shadow=False,
@@ -237,7 +236,9 @@ for POtype in list_POtype:
         y_test  = y[indices[-nb:]]
         
         #regr = linear_model.LinearRegression()
-        regr = linear_model.Ridge(alpha=.1)
+        #regr = linear_model.Lasso(positive=True)
+        regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
+        #regr = linear_model.Ridge(alpha=.1)
         regr.fit(X_train, y_train)
 
         tmp = dict()
