@@ -1,2 +1,3 @@
 figures
 *.swp
+__pycache__
