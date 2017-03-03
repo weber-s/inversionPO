@@ -93,15 +93,7 @@ def plot_station(station,POtype):
     # factors contribution
     ax=plt.subplot(2,3,5)
     plot_coeff(station, ax=ax)
-    #Station.m.plot(ax=ax,
-    #               kind="bar",
-    #               #yerr=np.sqrt(np.diag(Covm)),
-    #               #ecolor="k",
-    #               align='center',
-    #               rot=-60,
-    #               legend=False)
     plt.ylabel("PO [nmol/min/µg]")
-    #plt.ylim((-0.1,1.4))
     # Pie chart
     ax=plt.subplot(2,3,6)
     plot_contribPie(ax, station)
