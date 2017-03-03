@@ -68,7 +68,6 @@ def solve_inversion(d, G, std, x_min=None, x_max=None):
         lp_prob += condition, label
         condition = (d[i] - dot_G_x) >= -m - 0.5*std[i]
         lp_prob += condition, label2
-    #lp_prob.writeLP("MinmaxProblem.lp")  # optional
     lp_prob.solve()
 
     return lp_prob
@@ -106,7 +105,7 @@ for POtype in list_POtype:
     pie = pd.Series()
     for name in list_station:
         print("=============="+name+"====================")
-        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File, index_col="date", parse_dates=["date"], dayfirst=True)   
+        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File, index_col="date", parse_dates=["date"], dayfirst=True)
         PO      = pd.read_csv(INPUT_DIR+name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
         if not(fromSource):
             # select the species we want
@@ -164,6 +163,7 @@ for POtype in list_POtype:
             #tmp.rename(newname, inplace=True)
 
         elif OrdinaryLeastSquare:
+            # Ordinary least square method (implemeted by myself)
             m, Covm, Res =  lsqr(CHEM,
                                  POunc,
                                  PO,
