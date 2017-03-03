@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 #import sklearn
+from scipy import linalg
 from scipy import polyfit
 from sklearn import linear_model 
 
@@ -30,6 +31,8 @@ class Station:
             self.p      = None
             self.r2     = None
         self.hasPO  = hasPO
+        self.pie.sort_index(inplace=True)
+        self.m.sort_index(inplace=True)
 
 
 def renameIndex():
@@ -49,6 +52,20 @@ def renameIndex():
         }
     return rename
 
+def sitesColor():
+    """
+    Colors for the sites. Follows mpl.colors.TABLEAU_COLORS
+    """
+    color ={
+        "Marnaz": "#1f77b4",
+        "Passy": "#ff7f0e",
+        "Chamonix": "#2ca02c",
+        "Frenes": "#d62728",
+        "Nice": "#9467bd"
+    }
+    color = pd.DataFrame(index=["color"], data=color)
+    return color
+
 def sourcesColor():
     color ={
         "Vehicular": '#000000',
@@ -56,7 +73,9 @@ def sourcesColor():
         "Sulfate-rich": '#ff2a2a',
         "Nitrate-rich": '#ff7f2a',
         "Secondary bio": '#8c564b',
+        "Marine biogenic/HFO": '#8c564b',
         "Sea/road salt": '#00b0f0',
+        "Aged sea salt": '#00b0ff',
         "Primary bio": '#ffc000',
         "Mineral dust": '#e9ddaf',
         "AOS/dust": '#e9ddaf',
@@ -104,13 +123,14 @@ def plot_station(Station,POtype):
     plot_scatterReconsObs(ax, Station.PO, Station.model, Station.p, Station.r2)
     # factors contribution
     ax=plt.subplot(2,3,5)
-    Station.m.plot(ax=ax,
-                   kind="bar",
-                   #yerr=np.sqrt(np.diag(Covm)),
-                   #ecolor="k",
-                   align='center',
-                   rot=-60,
-                   legend=False)
+    plot_coeff(Station, ax=ax)
+    #Station.m.plot(ax=ax,
+    #               kind="bar",
+    #               #yerr=np.sqrt(np.diag(Covm)),
+    #               #ecolor="k",
+    #               align='center',
+    #               rot=-60,
+    #               legend=False)
     plt.ylabel("PO [nmol/min/µg]")
     #plt.ylim((-0.1,1.4))
     # Pie chart
@@ -148,12 +168,40 @@ def plot_contribPie(ax, Station, title=None, ylabel=None):
         ax.set_title(title)
     ax.set_ylabel("")
 
-def plot_coeff(station, ax=None):
+def plot_coeff(stations, ax=None):
     """Plot a bar plot of the intrinsique PO of the sources for all the station"""
     if ax==None:
-        ax = plt.subplots(row=len(POtype_list), columns=len(station.keys()))
-    station.plot.bar(ax=ax, legend=False)
+        ax = plt.subplots(row=len(POtype_list), columns=len(stations.keys()))
 
+    c = sitesColor()
+    cols = list()
+    try:
+        for s in stations:
+            cols.append(c.ix["color"][s])
+        stations.plot.bar(ax=ax, legend=False, color=cols)
+    except TypeError:
+        cols.append(c.ix["color"][stations.name])
+        stations.m.plot.bar(ax=ax, legend=False, color=cols)
+
+def lsqr(CHEM, POunc, PO, fromSource):
+    G   = CHEM.as_matrix()
+    d   = PO.as_matrix()
+    C   = np.diag(np.power(POunc.as_matrix(),2))
+
+    Gt          = G.T
+    invC        = linalg.inv(C)
+    GtinvC      = np.dot(Gt,invC)
+    invGtinvCG  = linalg.inv(np.dot(GtinvC,G))
+    invGtinvCGGt= np.dot(invGtinvCG,Gt)
+    Gg          = np.dot(invGtinvCGGt,invC)
+    #GtGinvGt=np.dot(linalg.inv(GtG),G.T)
+    #r=np.dot(GtGinvGt,b)
+    Covm    = np.dot(Gg.dot(C),Gg.T)
+    Res     = Gg.dot(G)
+    m       = Gg.dot(d)
+
+    m = pd.Series(index=CHEM.columns, data=m)
+    return m, Covm, Res
 
 def solve_inversion(d, G, std, x_min=None, x_max=None):
     x   = pulp.LpVariable.dicts("PO", G.columns, x_min, x_max)
@@ -174,19 +222,30 @@ def solve_inversion(d, G, std, x_min=None, x_max=None):
 
     return lp_prob
 
-DIR = "/home/samuel/Documents/IGE/BdD_PO/"
-list_station= ("Frenes","Passy","Marnaz","Chamonix")
-list_POtype = ("PODTTm3","POAAm3","POPerCent")
+INPUT_DIR = "/home/samuel/Documents/IGE/BdD_PO/"
+OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
+list_station= ["Nice","Marnaz","Passy","Chamonix"]
+#list_station= ("Passy",)
+list_POtype = ["PODTTm3","POAAm3"]
+
+
+OrdinaryLeastSquare = False
+MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
-saveFig     = False
+saveFig     = True
 plotTS      = True
 
 if fromSource:
-    name_File="ContributionsMass.csv"
+    name_File="_ContributionsMass_positive.csv"
 else:
     name_File="CHEM_conc.csv"
 
+
+# sort list in order to always have the same order
+list_station.sort()
+list_POtype.sort()
+# initialize stuff
 sto = dict()
 saveCoeff = dict()
 for POtype in list_POtype:
@@ -196,8 +255,8 @@ for POtype in list_POtype:
     pie = pd.Series()
     for name in list_station:
         print("=============="+name+"====================")
-        CHEM    = pd.read_csv(DIR+name+"/"+name+name_File, index_col="date", parse_dates=["date"], dayfirst=True)   
-        PO      = pd.read_csv(DIR+name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
+        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File, index_col="date", parse_dates=["date"], dayfirst=True)   
+        PO      = pd.read_csv(INPUT_DIR+name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
         if not(fromSource):
             # select the species we want
             colOK   = ("OC","EC",\
@@ -210,7 +269,8 @@ for POtype in list_POtype:
 
         if not(POtype in PO.columns):
             sto[POtype][name] = Station(name=name, CHEM=CHEM, hasPO=False)
-            s   = pd.concat([s, sto[POtype][name].m],axis=1)
+            stmp= pd.Series(sto[POtype][name].m,name=name)
+            s   = pd.concat([s, stmp],axis=1)
             pie = pd.concat([pie, sto[POtype][name].m],axis=1)
             continue
         POunc   = PO["unc"+POtype]
@@ -223,39 +283,55 @@ for POtype in list_POtype:
         POunc   = TMP["unc"+POtype]
         CHEM    = TMP.ix[:,2:]
 
-        # ==== Separate the dataset into a training and test set
-        #np.random.seed(0)
-        indices = np.random.permutation(len(PO))
-        
-        nb      = 1
-        X       = CHEM.values
-        y       = PO.values
-        X_train = X[indices[:-nb]][:]
-        X_test  = X[indices[-nb:]][:]
-        y_train = y[indices[:-nb]]
-        y_test  = y[indices[-nb:]]
-        
-        #regr = linear_model.LinearRegression()
-        #regr = linear_model.Lasso(positive=True)
-        regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
-        #regr = linear_model.Ridge(alpha=.1)
-        regr.fit(X_train, y_train)
+        # Machine learning from scikit
+        if MachineLearning:
+            # ==== Separate the dataset into a training and test set
+            X       = CHEM.values
+            y       = PO.values
+            #X_train = X[indices[:-nb]][:]
+            #np.random.seed(0)
+            #indices = np.random.permutation(len(PO))
 
-        tmp = dict()
-        for i, v in enumerate(regr.coef_):
-            tmp[CHEM.columns[i]] = v
-            print(CHEM.columns[i], "=", v)
-        tmp = pd.Series(tmp,name=name)
-        #newname = renameIndex()
-        #tmp.rename(newname, inplace=True)
-        s   = pd.concat([s,tmp],axis=1)
+            #nb      = 1
+            #X_test  = X[indices[-nb:]][:]
+            #y_train = y[indices[:-nb]]
+            #y_test  = y[indices[-nb:]]
+
+            #regr = linear_model.LinearRegression()
+            #regr = linear_model.Lasso(positive=True)
+            #regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
+            #regr = linear_model.Ridge(alpha=0.01)
+            regr = linear_model.Lars(positive=True)
+            regr.fit(X, y)
+
+            tmp = dict()
+            for i, v in enumerate(regr.coef_):
+                tmp[CHEM.columns[i]] = v
+                print(CHEM.columns[i], "=", v)
+            m = pd.Series(tmp,name=name)
+            #newname = renameIndex()
+            #tmp.rename(newname, inplace=True)
+
+        elif OrdinaryLeastSquare:
+            m, Covm, Res =  lsqr(CHEM,
+                                 POunc,
+                                 PO,
+                                 fromSource)
+            m.name  = name
+
+        s   = pd.concat([s,m],axis=1)
         sto[POtype][name] = Station(name=name,
                                     CHEM=CHEM,
                                     PO=PO,
-                                    m=tmp)
+                                    m=m)
         if plotTS:
             plot_station(sto[POtype][name],POtype)
-    saveCoeff[POtype] = s.dropna(axis=1, how="all")
+            if saveFig:
+                plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
+                plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
+                plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+
+    saveCoeff[POtype] = s.ix[:,list_station]
 
 # ========== CONTRIBUTION PIE CHART ===========================================
 f,axes = plt.subplots(nrows=len(list_POtype),ncols=len(list_station),figsize=(17,8))
@@ -268,13 +344,13 @@ for j, row in enumerate(axes):
         plot_contribPie(ax, station)
         if i == 0:
             ax.set_ylabel(list_POtype[j], {'size': '16'} )
-            ax.yaxis.labelpad = 100
+            ax.yaxis.labelpad = 50
 plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
 if saveFig:
-    plt.savefig("figures/contribAllSites.png")
-    plt.savefig("figures/svg/contribAllSites.svg")
-    plt.savefig("figures/pdf/contribAllSites.pdf")
+    plt.savefig(OUTPUT_DIR+"contribAllSites.png")
+    plt.savefig(OUTPUT_DIR+"svg/contribAllSites.svg")
+    plt.savefig(OUTPUT_DIR+"pdf/contribAllSites.pdf")
 
 # ========== PLOT COEFFICIENT =================================================
 f, axes = plt.subplots(nrows=len(list_POtype),ncols=1,sharex=True,figsize=(17,8))
@@ -283,16 +359,16 @@ for j, ax in enumerate(axes):
     plot_coeff(station, ax=ax)
     ax.set_title(list_POtype[j])
     ax.set_ylabel("nmol/min/µg")
-    plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
-               ncol=len(list_station))
-    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
+           ncol=len(list_station))
+plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 if fromSource:
     l   = ax.get_xticklabels() # -2 because ax[-1] is ""
     ax.set_xticklabels(l, rotation=0)
 
 if saveFig:
-    plt.savefig("figures/coeffAllSites.png")
-    plt.savefig("figures/svg/coeffAllSites.svg")
-    plt.savefig("figures/pdf/coeffAllSites.pdf")
+    plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
+    plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
+    plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
 
 

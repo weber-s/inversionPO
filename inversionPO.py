@@ -67,14 +67,17 @@ def sourcesColor():
         "Sulfate-rich": '#ff2a2a',
         "Nitrate-rich": '#ff7f2a',
         "Secondary bio": '#8c564b',
+        "Marine biogenic/HFO": '#8c564b',
         "Sea/road salt": '#00b0f0',
+        "Aged sea salt": '#00b0ff',
         "Primary bio": '#ffc000',
         "Mineral dust": '#e9ddaf',
         "AOS/dust": '#e9ddaf',
         "Industrial": '#7030a0',
         "Débris végétaux": '#2aff80',
         "Chlorure": '#80e5ff',
-        "PM other": '#cccccc'
+        "PM other": '#cccccc',
+        "nan": '#ffffff'
     }
     color = pd.DataFrame(index=["color"], data=color)
     return color
@@ -337,17 +340,17 @@ fileDirPO   = "/home/samuel/Documents/IGE/BdD_PO/"
 fromSource  = True
 
 
-station_list= ("Frenes","Passy","Marnaz","Chamonix")
+#station_list= ("Frenes","Passy","Marnaz","Chamonix")
 #station_list= ("Passy","Marnaz","Chamonix")
-#station_list= ("Marnaz",)
-POtype_list = ["POAAm3", "PODTTm3","POPerCent"]
+station_list= ("Nice",)
+POtype_list = ["POAAm3", "PODTTm3"]
 #POtype_list = ["POPerCent"]
 
 plotBool    = True
 saveFig     = False
 
 if fromSource:
-    BasefileConc= "ContributionsMass_positive.csv"
+    BasefileConc= "_ContributionsMass_positive.csv"
     BasefilePO  = "PO.csv"
 else:
     BasefileConc= "PO+CHEM_conc.csv"
