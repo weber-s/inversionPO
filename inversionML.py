@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 from scipy import linalg
 from scipy import polyfit
 from sklearn import linear_model
-from plot_utility import *
+from plot_utility.plot_utility import *
 
 class Station:
     def __init__(self,name=None,CHEM=None,PO=None,m=None,hasPO=True):
         self.name   = name
         self.CHEM   = CHEM
+        self.pieCHEM= CHEM.sum()
         if hasPO:
             self.PO     = PO
             self.m      = m
@@ -32,6 +33,7 @@ class Station:
         self.hasPO  = hasPO
         self.pie.sort_index(inplace=True)
         self.m.sort_index(inplace=True)
+        self.pieCHEM.sort_index(inplace=True)
 
 
 def lsqr(CHEM, POunc, PO, fromSource):
@@ -84,7 +86,7 @@ MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
 saveFig     = False
-plotTS      = True
+plotTS      = False
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -222,4 +224,26 @@ if saveFig:
     plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
     plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
 
+# ========== COMPARE CHEM - PO PIE CHART ========================================
+f,axes = plt.subplots(nrows=len(list_POtype)+1,ncols=len(list_station),figsize=(17,8))
+for j, row in enumerate(axes):
+    for i, ax in enumerate(row):
+        if j==0:
+            ax.set_title(list_station[i])
+            df = sto[list_POtype[j]][list_station[i]].pieCHEM
+        else:
+            df = sto[list_POtype[j-1]][list_station[i]].pie
+        plot_contribPie(ax, df)
+        if i == 0:
+            if j == 0:
+                ax.set_ylabel("Mass", {'size': '16'} )
+            else:
+                ax.set_ylabel(list_POtype[j-1], {'size': '16'} )
+            ax.yaxis.labelpad = 50
+plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+
+if saveFig:
+    plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
+    plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
+    plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
 

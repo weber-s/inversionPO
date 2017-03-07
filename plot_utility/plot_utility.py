@@ -39,15 +39,19 @@ def sitesColor():
 def sourcesColor():
     color ={
         "Vehicular": '#000000',
+        "Road traffic": '#000000',
         "Bio. burning": '#92d050',
+        "BB": '#92d050',
         "Sulfate-rich": '#ff2a2a',
         "Nitrate-rich": '#ff7f2a',
         "Secondary bio": '#8c564b',
         "Marine biogenic/HFO": '#8c564b',
         "Sea/road salt": '#00b0f0',
+        "Sea salt": '#00b0f0',
         "Aged sea salt": '#00b0ff',
         "Primary bio": '#ffc000',
         "Mineral dust": '#e9ddaf',
+        "Resuspended dust": '#e9ddaf',
         "AOS/dust": '#e9ddaf',
         "Industrial": '#7030a0',
         "Débris végétaux": '#2aff80',
@@ -105,12 +109,17 @@ def plot_contribPie(ax, station, fromSource=True, title=None, ylabel=None):
     Plot contributions of the sources to the PO in a Pie chart
     The contributions is G*m.
     """
-    if not(station.hasPO):
-        ax.set_aspect('equal')
-        station.pie.plot.pie(ax=ax)
-        ax.set_ylabel("")
-        return
-    df = station.pie
+    # check if station is an object or a DataFrame
+    if isinstance(station, pd.Series):
+        df = station
+    else:
+        if not(station.hasPO):
+            ax.set_aspect('equal')
+            station.pie.plot.pie(ax=ax)
+            ax.set_ylabel("")
+            return
+        df = station.pie
+
     if fromSource:
         c = sourcesColor()
         cols = c.ix["color",df.index].values
