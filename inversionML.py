@@ -37,20 +37,20 @@ class Station:
         self.pieCHEM.sort_index(inplace=True)
 
 
-def solve_lsqr(CHEM, POunc, PO, fromSource):
-    G   = CHEM.as_matrix()
-    d   = PO.as_matrix()
-    C   = np.diag(np.power(POunc.as_matrix(),2))
+def solve_lsqr(G=None, d=None, Covd=None):
+    #G   = CHEM.as_matrix()
+    #d   = PO.as_matrix()
+    #C   = np.diag(np.power(POunc.as_matrix(),2))
 
     Gt          = G.T
-    invC        = linalg.inv(C)
+    invC        = linalg.inv(Covd)
     GtinvC      = np.dot(Gt,invC)
     invGtinvCG  = linalg.inv(np.dot(GtinvC,G))
     invGtinvCGGt= np.dot(invGtinvCG,Gt)
     Gg          = np.dot(invGtinvCGGt,invC)
     #GtGinvGt=np.dot(linalg.inv(GtG),G.T)
     #r=np.dot(GtGinvGt,b)
-    Covm    = np.dot(Gg.dot(C),Gg.T)
+    Covm    = np.dot(Gg.dot(Covd),Gg.T)
     Res     = Gg.dot(G)
     m       = Gg.dot(d)
 
@@ -167,10 +167,10 @@ for POtype in list_POtype:
 
         elif OrdinaryLeastSquare:
             # Ordinary least square method (implemeted by myself)
-            m, Covm, Res =  solve_lsqr(CHEM,
-                                       POunc,
-                                       PO,
-                                       fromSource)
+            m, Covm, Res =  solve_lsqr(G=CHEM.as_matrix(),
+                                       d=PO.as_matrix,
+                                       Covd=np.diag(np.power(POunc.as_matrix(),2)))
+                                   
             m.name  = name
 
         s   = pd.concat([s,m],axis=1)
