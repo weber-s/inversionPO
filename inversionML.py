@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 #import sklearn
 from scipy import linalg
 from scipy import polyfit
+import pulp
 from sklearn import linear_model
 from plot_utility.plot_utility import *
 
@@ -36,7 +37,7 @@ class Station:
         self.pieCHEM.sort_index(inplace=True)
 
 
-def lsqr(CHEM, POunc, PO, fromSource):
+def solve_lsqr(CHEM, POunc, PO, fromSource):
     G   = CHEM.as_matrix()
     d   = PO.as_matrix()
     C   = np.diag(np.power(POunc.as_matrix(),2))
@@ -56,7 +57,7 @@ def lsqr(CHEM, POunc, PO, fromSource):
     m = pd.Series(index=CHEM.columns, data=m)
     return m, Covm, Res
 
-def solve_inversion(d, G, std, x_min=None, x_max=None):
+def solve_inversion_LP(d, G, std, x_min=None, x_max=None):
     x   = pulp.LpVariable.dicts("PO", G.columns, x_min, x_max)
     m   = pulp.LpVariable("to_minimize", 0)
     lp_prob = pulp.LpProblem("Minmax Problem", pulp.LpMinimize)
@@ -166,10 +167,10 @@ for POtype in list_POtype:
 
         elif OrdinaryLeastSquare:
             # Ordinary least square method (implemeted by myself)
-            m, Covm, Res =  lsqr(CHEM,
-                                 POunc,
-                                 PO,
-                                 fromSource)
+            m, Covm, Res =  solve_lsqr(CHEM,
+                                       POunc,
+                                       PO,
+                                       fromSource)
             m.name  = name
 
         s   = pd.concat([s,m],axis=1)
