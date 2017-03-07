@@ -75,6 +75,30 @@ def solve_inversion_LP(d, G, std, x_min=None, x_max=None):
 
     return lp_prob
 
+def solve_scikit_linear_regression(X=None, y=None):
+    """
+    Solve m*X = y using the sklearn module.
+    Different solvers are available.
+    """
+    if X is None or y is None:
+        print("Missing X or y data. Skipping.")
+        return
+    #regr = linear_model.LinearRegression()
+    #regr = linear_model.Lasso(positive=True)
+    #regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
+    #regr = linear_model.Ridge(alpha=0.01)
+    regr = linear_model.Lars(positive=True)
+    regr.fit(X, y)
+
+    m   = dict()
+    for i, v in enumerate(regr.coef_):
+        m[CHEM.columns[i]] = v
+        print(CHEM.columns[i], "=", v)
+    m = pd.Series(m)
+    return m
+
+
+
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD_PO/"
 OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
 list_station= ["Nice","Marnaz","Passy","Chamonix"]
@@ -126,6 +150,8 @@ for POtype in list_POtype:
             s   = pd.concat([s, stmp],axis=1)
             pie = pd.concat([pie, sto[POtype][name].m],axis=1)
             continue
+
+        # ==== Drop day with missing values
         POunc   = PO["unc"+POtype]
         PO      = PO[POtype]
 
@@ -135,44 +161,20 @@ for POtype in list_POtype:
         PO      = TMP[POtype]
         POunc   = TMP["unc"+POtype]
         CHEM    = TMP.ix[:,2:]
-
-        # Machine learning from scikit
+        
+        # ==== Different inversion method
         if MachineLearning:
-            # ==== Separate the dataset into a training and test set
-            X       = CHEM.values
-            y       = PO.values
-            #X_train = X[indices[:-nb]][:]
-            #np.random.seed(0)
-            #indices = np.random.permutation(len(PO))
-
-            #nb      = 1
-            #X_test  = X[indices[-nb:]][:]
-            #y_train = y[indices[:-nb]]
-            #y_test  = y[indices[-nb:]]
-
-            #regr = linear_model.LinearRegression()
-            #regr = linear_model.Lasso(positive=True)
-            #regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
-            #regr = linear_model.Ridge(alpha=0.01)
-            regr = linear_model.Lars(positive=True)
-            regr.fit(X, y)
-
-            tmp = dict()
-            for i, v in enumerate(regr.coef_):
-                tmp[CHEM.columns[i]] = v
-                print(CHEM.columns[i], "=", v)
-            m = pd.Series(tmp,name=name)
-            #newname = renameIndex()
-            #tmp.rename(newname, inplace=True)
-
+            # Machine learning from scikit
+            m       = solve_scikit_linear_regression(X=CHEM.values, y=PO.values)
+            m.name  = name
         elif OrdinaryLeastSquare:
             # Ordinary least square method (implemeted by myself)
             m, Covm, Res =  solve_lsqr(G=CHEM.as_matrix(),
                                        d=PO.as_matrix,
                                        Covd=np.diag(np.power(POunc.as_matrix(),2)))
-                                   
             m.name  = name
-
+        
+        # ==== Store the result
         s   = pd.concat([s,m],axis=1)
         sto[POtype][name] = Station(name=name,
                                     CHEM=CHEM,
