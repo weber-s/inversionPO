@@ -156,3 +156,32 @@ def plot_coeff(stations, ax=None):
     except TypeError:
         cols.append(c.ix["color"][stations.name])
         stations.m.plot.bar(ax=ax, legend=False, color=cols)
+
+
+def plot_ts_contribution_PO(station,POtype=None,saveDir=None):
+    """
+    Plot the time serie contribution of each source to the PO.
+    station can be the name of the station or a Station object.
+    If station is a string, then the saveDir variable must be the path to the
+    directory where the file is saved.
+    The file name must be in the format 
+        {station name}_contribution_{POtype}.csv
+    """
+    
+    if isinstance(station, str):
+        if saveDir == None:
+            print("ERROR: the 'saveDir' argument must be completed")
+            return
+        title = station 
+        fileName = saveDir+station+"_contribution_"+POtype+".csv"
+        df = pd.read_csv(fileName,index_col="date", parse_dates=["date"])
+    else:
+        df = station.CHEM * station.m
+        title = station.name
+
+    c = sourcesColor()
+    cols = c.ix["color",df.columns].values
+    
+    df.plot(title=title, color=cols)
+    plt.ylabel(POtype)
+    return

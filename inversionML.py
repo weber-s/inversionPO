@@ -2,12 +2,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 #import sklearn
-from scipy import linalg
-from scipy import polyfit
-import pulp
+from scipy import linalg, polyfit
+#import pulp
 from sklearn import linear_model
-from sklearn.preprocessing import StandardScaler
 from misc_utility.plot_utility import *
+from misc_utility.save_utility import result2csv
+
 
 class Station:
     def __init__(self,name=None,CHEM=None,PO=None,m=None,hasPO=True):
@@ -102,6 +102,7 @@ def solve_scikit_linear_regression(X=None, y=None):
 
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD_PO/"
 OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
+SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionLARS/"
 list_station= ["Marnaz","Passy","Chamonix"]
 list_POtype = ["POAAm3","PODTTm3"]
 
@@ -111,7 +112,8 @@ MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
 saveFig     = False
-plotTS      = True
+plotTS      = False
+saveResult  = True
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -190,6 +192,9 @@ for POtype in list_POtype:
                 plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
                 plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
                 plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+
+        if saveResult:
+            result2csv(sto[POtype][name],saveDir=SAVE_DIR,POtype=POtype)
 
     saveCoeff[POtype] = s.ix[:,list_station]
 
