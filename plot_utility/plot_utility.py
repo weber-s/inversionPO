@@ -39,8 +39,10 @@ def sitesColor():
 def sourcesColor():
     color ={
         "Vehicular": '#000000',
+        "Oil/Vehicular": '#000000',
         "Road traffic": '#000000',
         "Bio. burning": '#92d050',
+        "Bio burning": '#92d050',
         "BB": '#92d050',
         "Sulfate-rich": '#ff2a2a',
         "Nitrate-rich": '#ff7f2a',
@@ -52,8 +54,10 @@ def sourcesColor():
         "Primary bio": '#ffc000',
         "Mineral dust": '#e9ddaf',
         "Resuspended dust": '#e9ddaf',
+        "Dust": '#e9ddaf',
         "AOS/dust": '#e9ddaf',
         "Industrial": '#7030a0',
+        "Industry/vehicular": '#7030a0',
         "Débris végétaux": '#2aff80',
         "Chlorure": '#80e5ff',
         "PM other": '#cccccc',
@@ -148,7 +152,7 @@ def plot_coeff(stations, ax=None):
     try:
         for s in stations:
             cols.append(c.ix["color"][s])
-        stations.plot.bar(ax=ax, legend=False, color=cols)
+        stations.plot.bar(ax=ax, legend=False, color=cols,rot=30)
     except TypeError:
         cols.append(c.ix["color"][stations.name])
         stations.m.plot.bar(ax=ax, legend=False, color=cols)

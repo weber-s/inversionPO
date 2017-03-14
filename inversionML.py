@@ -6,6 +6,7 @@ from scipy import linalg
 from scipy import polyfit
 import pulp
 from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
 from plot_utility.plot_utility import *
 
 class Station:
@@ -101,9 +102,8 @@ def solve_scikit_linear_regression(X=None, y=None):
 
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD_PO/"
 OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
-list_station= ["Nice","Marnaz","Passy","Chamonix"]
-#list_station= ("Passy",)
-list_POtype = ["PODTTm3","POAAm3"]
+list_station= ["Marnaz","Passy","Chamonix"]
+list_POtype = ["POAAm3","PODTTm3"]
 
 
 OrdinaryLeastSquare = False
@@ -111,7 +111,7 @@ MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
 saveFig     = False
-plotTS      = False
+plotTS      = True
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -132,8 +132,12 @@ for POtype in list_POtype:
     pie = pd.Series()
     for name in list_station:
         print("=============="+name+"====================")
-        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File, index_col="date", parse_dates=["date"], dayfirst=True)
-        PO      = pd.read_csv(INPUT_DIR+name+"/"+name+"PO.csv", index_col="date", parse_dates=["date"], dayfirst=True)
+        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File,
+                              index_col="date", parse_dates=["date"],
+                              dayfirst=True)
+        PO      = pd.read_csv(INPUT_DIR+name+"/"+name+"PO.csv",
+                              index_col="date", parse_dates=["date"],
+                              dayfirst=True)
         if not(fromSource):
             # select the species we want
             colOK   = ("OC","EC",\
@@ -200,7 +204,7 @@ for j, row in enumerate(axes):
         plot_contribPie(ax, station)
         if i == 0:
             ax.set_ylabel(list_POtype[j], {'size': '16'} )
-            ax.yaxis.labelpad = 50
+            ax.yaxis.labelpad = 60
 plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
 if saveFig:
@@ -220,7 +224,7 @@ plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
 plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 if fromSource:
     l   = ax.get_xticklabels() # -2 because ax[-1] is ""
-    ax.set_xticklabels(l, rotation=0)
+    ax.set_xticklabels(l, rotation=10)
 
 if saveFig:
     plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
