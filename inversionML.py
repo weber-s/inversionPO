@@ -7,7 +7,7 @@ from scipy import polyfit
 import pulp
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
-from plot_utility.plot_utility import *
+from misc_utility.plot_utility import *
 
 class Station:
     def __init__(self,name=None,CHEM=None,PO=None,m=None,hasPO=True):
