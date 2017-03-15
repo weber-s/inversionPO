@@ -185,3 +185,44 @@ def plot_ts_contribution_PO(station,POtype=None,saveDir=None):
     df.plot(title=title, color=cols)
     plt.ylabel(POtype)
     return
+
+def plot_ts_reconstruction_PO(station, POtype=None, saveDir=None, ax=None):
+    """
+    Plot a stacked barplot of for the sources contributions to the PO
+    """
+    if ax == None:
+        f, ax = plt.subplots(1, figsize=(10,5))
+
+    if isinstance(station, str):
+        if saveDir == None:
+            print("ERROR: the 'saveDir' argument must be completed")
+            return
+        title = station 
+        fileName = saveDir+station+"_contribution_"+POtype+".csv"
+        df = pd.read_csv(fileName,index_col="date", parse_dates=["date"])
+    else:
+        df = station.CHEM * station.m
+        title = station.name
+
+    c = sourcesColor()
+    cols = c.ix["color",df.columns].values
+    
+    x = df.index
+    x.to_datetime()
+
+    count = 0
+    for i in range(df.shape[1]):
+        bottom=df.ix[:,0:count].sum(axis=1)
+        count += 1
+        ax.bar(x, df[df.columns[i]],
+               bottom=bottom,
+               label=df.columns[i],
+               width=2,
+               color=c[df.columns[i]])
+    plt.legend()
+    plt.title(title)
+    plt.ylabel(POtype)
+    return
+
+
+

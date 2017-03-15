@@ -111,8 +111,8 @@ OrdinaryLeastSquare = False
 MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
-saveFig     = False
-plotTS      = False
+saveFig     = True
+plotTS      = True
 saveResult  = True
 
 if fromSource:
@@ -192,6 +192,12 @@ for POtype in list_POtype:
                 plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
                 plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
                 plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+            plot_ts_reconstruction_PO(sto[POtype][name],POtype)
+            if saveFig:
+                plt.savefig(OUTPUT_DIR+"svg/reconstructionPerSource_"+name+POtype+".svg")
+                plt.savefig(OUTPUT_DIR+"pdf/reconstructionPerSource_"+name+POtype+".pdf")
+                plt.savefig(OUTPUT_DIR+"reconstructionPerSource_"+name+POtype+".png") 
+
 
         if saveResult:
             result2csv(sto[POtype][name],saveDir=SAVE_DIR,POtype=POtype)
@@ -258,4 +264,5 @@ if saveFig:
     plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
     plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
     plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
+
 
