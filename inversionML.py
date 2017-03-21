@@ -100,20 +100,22 @@ def solve_scikit_linear_regression(X=None, y=None):
 
 
 
-INPUT_DIR = "/home/samuel/Documents/IGE/BdD_PO/"
+INPUT_DIR = "/home/samuel/Documents/IGE/BdD/BdD_PO/"
 OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
 SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionLARS/"
-list_station= ["Marnaz","Passy","Chamonix"]
+list_station= ["Frenes","Nice","Marnaz","Passy","Chamonix"]
+# list_station= ["Nice"]
 list_POtype = ["POAAm3","PODTTm3"]
 
+# plt.interactive(True)
 
 OrdinaryLeastSquare = False
 MachineLearning     = not(OrdinaryLeastSquare)
 
 fromSource  = True
-saveFig     = True
+saveFig     = False
 plotTS      = True
-saveResult  = True
+saveResult  = False
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -187,11 +189,11 @@ for POtype in list_POtype:
                                     PO=PO,
                                     m=m)
         if plotTS:
-            plot_station(sto[POtype][name],POtype)
-            if saveFig:
-                plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
-                plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
-                plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+            # plot_station(sto[POtype][name],POtype)
+            # if saveFig:
+            #     plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
+            #     plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
+            #     plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
             plot_ts_reconstruction_PO(sto[POtype][name],POtype)
             if saveFig:
                 plt.savefig(OUTPUT_DIR+"svg/reconstructionPerSource_"+name+POtype+".svg")
@@ -204,65 +206,65 @@ for POtype in list_POtype:
 
     saveCoeff[POtype] = s.ix[:,list_station]
 
-# ========== CONTRIBUTION PIE CHART ===========================================
-f,axes = plt.subplots(nrows=len(list_POtype),ncols=len(list_station),figsize=(17,8))
-#ax.shape = (np.sum(ax.shape),) 
-for j, row in enumerate(axes):
-    for i, ax in enumerate(row):
-        station=sto[list_POtype[j]][list_station[i]]
-        if j == 0:
-            ax.set_title(list_station[i])
-        plot_contribPie(ax, station)
-        if i == 0:
-            ax.set_ylabel(list_POtype[j], {'size': '16'} )
-            ax.yaxis.labelpad = 60
-plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-
-if saveFig:
-    plt.savefig(OUTPUT_DIR+"contribAllSites.png")
-    plt.savefig(OUTPUT_DIR+"svg/contribAllSites.svg")
-    plt.savefig(OUTPUT_DIR+"pdf/contribAllSites.pdf")
-
-# ========== PLOT COEFFICIENT =================================================
-f, axes = plt.subplots(nrows=len(list_POtype),ncols=1,sharex=True,figsize=(17,8))
-for j, ax in enumerate(axes):
-    station = saveCoeff[list_POtype[j]]
-    plot_coeff(station, ax=ax)
-    ax.set_title(list_POtype[j])
-    ax.set_ylabel("nmol/min/µg")
-plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
-           ncol=len(list_station))
-plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-if fromSource:
-    l   = ax.get_xticklabels() # -2 because ax[-1] is ""
-    ax.set_xticklabels(l, rotation=10)
-
-if saveFig:
-    plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
-    plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
-    plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
-
-# ========== COMPARE CHEM - PO PIE CHART ========================================
-f,axes = plt.subplots(nrows=len(list_POtype)+1,ncols=len(list_station),figsize=(17,8))
-for j, row in enumerate(axes):
-    for i, ax in enumerate(row):
-        if j==0:
-            ax.set_title(list_station[i])
-            df = sto[list_POtype[j]][list_station[i]].pieCHEM
-        else:
-            df = sto[list_POtype[j-1]][list_station[i]].pie
-        plot_contribPie(ax, df)
-        if i == 0:
-            if j == 0:
-                ax.set_ylabel("Mass", {'size': '16'} )
-            else:
-                ax.set_ylabel(list_POtype[j-1], {'size': '16'} )
-            ax.yaxis.labelpad = 50
-plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-
-if saveFig:
-    plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
-    plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
-    plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
+## ========== CONTRIBUTION PIE CHART ===========================================
+#f,axes = plt.subplots(nrows=len(list_POtype),ncols=len(list_station),figsize=(17,8))
+##ax.shape = (np.sum(ax.shape),) 
+#for j, row in enumerate(axes):
+#    for i, ax in enumerate(row):
+#        station=sto[list_POtype[j]][list_station[i]]
+#        if j == 0:
+#            ax.set_title(list_station[i])
+#        plot_contribPie(ax, station)
+#        if i == 0:
+#            ax.set_ylabel(list_POtype[j], {'size': '16'} )
+#            ax.yaxis.labelpad = 60
+#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+#
+#if saveFig:
+#    plt.savefig(OUTPUT_DIR+"contribAllSites.png")
+#    plt.savefig(OUTPUT_DIR+"svg/contribAllSites.svg")
+#    plt.savefig(OUTPUT_DIR+"pdf/contribAllSites.pdf")
+#
+## ========== PLOT COEFFICIENT =================================================
+#f, axes = plt.subplots(nrows=len(list_POtype),ncols=1,sharex=True,figsize=(17,8))
+#for j, ax in enumerate(axes):
+#    station = saveCoeff[list_POtype[j]]
+#    plot_coeff(station, ax=ax)
+#    ax.set_title(list_POtype[j])
+#    ax.set_ylabel("nmol/min/µg")
+#plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
+#           ncol=len(list_station))
+#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+#if fromSource:
+#    l   = ax.get_xticklabels() # -2 because ax[-1] is ""
+#    ax.set_xticklabels(l, rotation=10)
+#
+#if saveFig:
+#    plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
+#    plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
+#    plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
+#
+## ========== COMPARE CHEM - PO PIE CHART ========================================
+#f,axes = plt.subplots(nrows=len(list_POtype)+1,ncols=len(list_station),figsize=(17,8))
+#for j, row in enumerate(axes):
+#    for i, ax in enumerate(row):
+#        if j==0:
+#            ax.set_title(list_station[i])
+#            df = sto[list_POtype[j]][list_station[i]].pieCHEM
+#        else:
+#            df = sto[list_POtype[j-1]][list_station[i]].pie
+#        plot_contribPie(ax, df)
+#        if i == 0:
+#            if j == 0:
+#                ax.set_ylabel("Mass", {'size': '16'} )
+#            else:
+#                ax.set_ylabel(list_POtype[j-1], {'size': '16'} )
+#            ax.yaxis.labelpad = 50
+#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+#
+#if saveFig:
+#    plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
+#    plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
+#    plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
 
 

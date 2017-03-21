@@ -38,30 +38,31 @@ def sitesColor():
 
 def sourcesColor():
     color ={
-        "Vehicular": '#000000',
-        "Oil/Vehicular": '#000000',
-        "Road traffic": '#000000',
-        "Bio. burning": '#92d050',
-        "Bio burning": '#92d050',
-        "BB": '#92d050',
-        "Sulfate-rich": '#ff2a2a',
-        "Nitrate-rich": '#ff7f2a',
-        "Secondary bio": '#8c564b',
-        "Marine biogenic/HFO": '#8c564b',
-        "Sea/road salt": '#00b0f0',
-        "Sea salt": '#00b0f0',
-        "Aged sea salt": '#00b0ff',
-        "Primary bio": '#ffc000',
-        "Mineral dust": '#e9ddaf',
-        "Resuspended dust": '#e9ddaf',
-        "Dust": '#e9ddaf',
-        "AOS/dust": '#e9ddaf',
-        "Industrial": '#7030a0',
-        "Industry/vehicular": '#7030a0',
-        "Débris végétaux": '#2aff80',
-        "Chlorure": '#80e5ff',
-        "PM other": '#cccccc',
-        "nan": '#ffffff'
+        "Vehicular": "#000000",
+        "Oil/Vehicular": "#000000",
+        "Road traffic": "#000000",
+        "Bio. burning": "#92d050",
+        "Bio burning": "#92d050",
+        "BB": "#92d050",
+        "Sulfate-rich": "#ff2a2a",
+        "Nitrate-rich": "#ff7f2a",
+        "Secondary bio": "#8c564b",
+        "Marine biogenic/HFO": "#8c564b",
+        "Marine bio/HFO": "#8c564b",
+        "Sea/road salt": "#00b0f0",
+        "Sea salt": "#00b0f0",
+        "Aged sea salt": "#00b0ff",
+        "Primary bio": "#ffc000",
+        "Mineral dust": "#dac6a2",
+        "Resuspended dust": "#dac6a2",
+        "Dust": "#dac6a2",
+        "AOS/dust": "#dac6a2",
+        "Industrial": "#7030a0",
+        "Industry/vehicular": "#7030a0",
+        "Débris végétaux": "#2aff80",
+        "Chlorure": "#80e5ff",
+        "PM other": "#cccccc",
+        "nan": "#ffffff"
     }
     color = pd.DataFrame(index=["color"], data=color)
     return color
@@ -81,6 +82,33 @@ def plot_scatterReconsObs(ax, obs, model, p, r2):
     ax.set_aspect(1./ax.get_data_ratio())
     l=plt.legend(loc="lower right")
     l.draw_frame(False)
+
+def plot_station_sources(station):
+    """
+    Plot the mass contrib (piechart), the scatter plot obs/recons, the
+    intrinsic PO and the contribution of the sources/species (TS + piechart).
+    TODO: it's ugly...
+    """
+    plt.figure(figsize=(17,8))
+    # Mass contribution (pie chart)
+    ax=plt.subplot(2,3,1)
+    plot_contribPie(ax, station.pieCHEM)
+    # Bar plot of coeff for the PO
+    ax=plt.subplot(2,3,2)
+    plot_coeff(station,ax)
+    plt.ylabel("PO [nmol/min/µg]")
+    # Scatter plot obs/recons.
+    ax=plt.subplot(2,3,3)
+    plot_scatterReconsObs(ax, station.PO, station.model, station.p, station.r2)
+    # time serie reconstruction/observation
+    ax=plt.subplot(2,3,(4,5))
+    plot_ts_reconstruction_PO(station,ax=ax)
+    plt.legend(mode="expand", bbox_to_anchor=(0.5,-0.1))
+    # PO contribution (pie chart)
+    ax=plt.subplot(2,3,6)
+    plot_contribPie(ax, station)
+
+    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
 def plot_station(station,POtype):
     """
@@ -186,7 +214,7 @@ def plot_ts_contribution_PO(station,POtype=None,saveDir=None):
     plt.ylabel(POtype)
     return
 
-def plot_ts_reconstruction_PO(station, POtype=None, saveDir=None, ax=None):
+def plot_ts_reconstruction_PO(station, POtype=None, POobs=None, saveDir=None, ax=None):
     """
     Plot a stacked barplot of for the sources contributions to the PO
     """
@@ -194,21 +222,34 @@ def plot_ts_reconstruction_PO(station, POtype=None, saveDir=None, ax=None):
         f, ax = plt.subplots(1, figsize=(10,5))
 
     if isinstance(station, str):
-        if saveDir == None:
-            print("ERROR: the 'saveDir' argument must be completed")
+        if saveDir == None or POobs == None:
+            print("ERROR: the 'saveDir' and 'POobs' arguments must be completed")
             return
         title = station 
         fileName = saveDir+station+"_contribution_"+POtype+".csv"
+        PO = POobs
         df = pd.read_csv(fileName,index_col="date", parse_dates=["date"])
     else:
         df = station.CHEM * station.m
+        PO = station.PO.values
         title = station.name
 
     c = sourcesColor()
     cols = c.ix["color",df.columns].values
     
+    # Date index
     x = df.index
     x.to_datetime()
+
+    # Width
+    # Set it to 1.5 when no overlapping, 1 otherwise.
+    width = np.ones(len(x))*1.5
+    deltal = x[1:]-x[:-1]
+    deltal = deltal.append(pd.TimedeltaIndex([10,],'D'))
+    deltar = pd.TimedeltaIndex([3],'D')
+    deltar = deltar.append(x[1:]-x[:-1])
+    width[deltal < np.timedelta64(2,'D')] = 1
+    width[deltar < np.timedelta64(2,'D')] = 1
 
     count = 0
     for i in range(df.shape[1]):
@@ -217,11 +258,18 @@ def plot_ts_reconstruction_PO(station, POtype=None, saveDir=None, ax=None):
         ax.bar(x, df[df.columns[i]],
                bottom=bottom,
                label=df.columns[i],
-               width=2,
+               width=width,
                color=c[df.columns[i]])
-    plt.legend()
+    ax.plot(x, PO, 'xr', label="OP obs.")
+    ncol = int((len(df.columns)+1)/2)
+    nrow = (len(df.columns)+1)/ncol
+    if nrow > 2:
+        ncol += 1
+    plt.legend(loc="center",ncol=ncol,bbox_to_anchor=(0.5,-0.16))
     plt.title(title)
     plt.ylabel(POtype)
+
+    plt.subplots_adjust(top=0.90, bottom=0.20, left=0.10, right=0.90)
     return
 
 
