@@ -4,118 +4,37 @@ import matplotlib.pyplot as plt
 #import sklearn
 from scipy import linalg, polyfit
 #import pulp
+import pickle
 from sklearn import linear_model
+from customClass import *
 from misc_utility.plot_utility import *
 from misc_utility.save_utility import result2csv
-
-
-class Station:
-    def __init__(self,name=None,CHEM=None,PO=None,m=None,hasPO=True):
-        self.name   = name
-        self.CHEM   = CHEM
-        self.pieCHEM= CHEM.sum()
-        if hasPO:
-            self.PO     = PO
-            self.m      = m
-            self.model  = pd.Series((CHEM*m).sum(axis=1), name=name)
-            if (m>=0).all():
-                self.pie    = pd.Series((CHEM*m).sum(), name=name)
-            else:
-                self.pie=pd.Series(index=CHEM.columns)
-            self.p      = polyfit(PO,self.model,1)
-            self.p.shape= (2,)
-            self.r2     = pd.concat([PO,self.model],axis=1).corr().as_matrix()
-        else:
-            self.PO     = None
-            self.m      = pd.Series(index=CHEM.columns)
-            self.model  = pd.Series(index=CHEM.index)
-            self.pie    = pd.Series(index=CHEM.columns)
-            self.p      = None
-            self.r2     = None
-        self.hasPO  = hasPO
-        self.pie.sort_index(inplace=True)
-        self.m.sort_index(inplace=True)
-        self.pieCHEM.sort_index(inplace=True)
-
-
-def solve_lsqr(G=None, d=None, Covd=None):
-    #G   = CHEM.as_matrix()
-    #d   = PO.as_matrix()
-    #C   = np.diag(np.power(POunc.as_matrix(),2))
-
-    Gt          = G.T
-    invC        = linalg.inv(Covd)
-    GtinvC      = np.dot(Gt,invC)
-    invGtinvCG  = linalg.inv(np.dot(GtinvC,G))
-    invGtinvCGGt= np.dot(invGtinvCG,Gt)
-    Gg          = np.dot(invGtinvCGGt,invC)
-    #GtGinvGt=np.dot(linalg.inv(GtG),G.T)
-    #r=np.dot(GtGinvGt,b)
-    Covm    = np.dot(Gg.dot(Covd),Gg.T)
-    Res     = Gg.dot(G)
-    m       = Gg.dot(d)
-
-    m = pd.Series(index=CHEM.columns, data=m)
-    return m, Covm, Res
-
-def solve_inversion_LP(d, G, std, x_min=None, x_max=None):
-    x   = pulp.LpVariable.dicts("PO", G.columns, x_min, x_max)
-    m   = pulp.LpVariable("to_minimize", 0)
-    lp_prob = pulp.LpProblem("Minmax Problem", pulp.LpMinimize)
-    lp_prob += m, "Minimize_the_maximum"
-
-    for i in range(len(G.index)):
-        label = "Val %d" % i
-        label2 = "Val2 %d" % i
-        dot_G_x = pulp.lpSum([G.ix[i][j] * x[j] for j in G.columns])
-        condition = (d[i] - dot_G_x) <= m + 0.5*std[i]
-        lp_prob += condition, label
-        condition = (d[i] - dot_G_x) >= -m - 0.5*std[i]
-        lp_prob += condition, label2
-    lp_prob.solve()
-
-    return lp_prob
-
-def solve_scikit_linear_regression(X=None, y=None):
-    """
-    Solve m*X = y using the sklearn module.
-    Different solvers are available.
-    """
-    if X is None or y is None:
-        print("Missing X or y data. Skipping.")
-        return
-    #regr = linear_model.LinearRegression()
-    #regr = linear_model.Lasso(positive=True)
-    #regr = linear_model.ElasticNet(l1_ratio=0, positive=True)
-    #regr = linear_model.Ridge(alpha=0.01)
-    regr = linear_model.Lars(positive=True)
-    regr.fit(X, y)
-
-    m   = dict()
-    for i, v in enumerate(regr.coef_):
-        m[CHEM.columns[i]] = v
-        print(CHEM.columns[i], "=", v)
-    m = pd.Series(m)
-    return m
+from misc_utility.solvers import *
+from misc_utility.load_data import *
 
 
 
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD/BdD_PO/"
-OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
-SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionLARS/"
-list_station= ["Frenes","Nice","Marnaz","Passy","Chamonix"]
+OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionGLS/"
+SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionGLS/"
+list_station= ["Nice","Frenes","Passy","Chamonix", "Marnaz"]
 # list_station= ["Nice"]
-list_POtype = ["POAAm3","PODTTm3"]
+
+list_POtype = ["AAv","DTTv"]
 
 # plt.interactive(True)
 
-OrdinaryLeastSquare = False
-MachineLearning     = not(OrdinaryLeastSquare)
+OrdinaryLeastSquare     = False
+GeneralizedLeastSquare  = True
+MachineLearning         = False
 
 fromSource  = True
-saveFig     = False
+saveFig     = True
 plotTS      = True
-saveResult  = False
+plotBar     = False
+saveResult  = True
+sum_sources = False
+plotAll     = False
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -129,19 +48,19 @@ list_POtype.sort()
 # initialize stuff
 sto = dict()
 saveCoeff = dict()
+saveCovm = dict()
+pvalues = dict()
 for POtype in list_POtype:
     sto[POtype]=dict()
     print("=============="+POtype+"====================")
     s = pd.Series()
+    cov_all = pd.Series()
     pie = pd.Series()
     for name in list_station:
         print("=============="+name+"====================")
-        CHEM    = pd.read_csv(INPUT_DIR+name+"/"+name+name_File,
-                              index_col="date", parse_dates=["date"],
-                              dayfirst=True)
-        PO      = pd.read_csv(INPUT_DIR+name+"/"+name+"PO.csv",
-                              index_col="date", parse_dates=["date"],
-                              dayfirst=True)
+        CHEM = load_CHEMorPO(name, INPUT_DIR, CHEMorPO="CHEM", fromSource=fromSource)
+        PO   = load_CHEMorPO(name, INPUT_DIR, CHEMorPO="PO")
+
         if not(fromSource):
             # select the species we want
             colOK   = ("OC","EC",\
@@ -151,49 +70,115 @@ for POtype in list_POtype:
                        "ΣHAP","ΣHOP","Σmethoxy_part")
             CHEM    = CHEM.ix[:,colOK]
             CHEM.dropna(axis=1, how="all", inplace=True)
+        
+        # rename columns
+        CHEM = setSourcesCategories(CHEM)
 
-        if not(POtype in PO.columns):
+        if sum_sources:
+            # print(CHEM)
+            to_mergeBB = ["Bio_burning1","Bio_burning2"]
+            to_mergeVeh= ["Vehicular_ind","Vehicular_dir"]
+            try:
+                CHEM["Bio_burning"] = CHEM[to_mergeBB].sum(axis=1)
+                CHEM.drop(to_mergeBB, axis=1,inplace=True)
+            except:
+                print("The sources {merge} are not in the site {site}".format(merge=to_mergeBB, site=name))
+            try:
+                CHEM["Vehicular"] = CHEM[to_mergeVeh].sum(axis=1)
+                CHEM.drop(to_mergeVeh, axis=1,inplace=True)
+            except:
+                print("The sources {merge} are not in the site {site}".format(merge=to_mergeVeh, site=name))
+
+        if not(POtype in PO.columns) or PO[POtype].isnull().all():
             sto[POtype][name] = Station(name=name, CHEM=CHEM, hasPO=False)
             stmp= pd.Series(sto[POtype][name].m,name=name)
+            covtmp = pd.Series(sto[POtype][name].covm,name=name) 
             s   = pd.concat([s, stmp],axis=1)
+            cov_all = pd.concat([cov_all, covtmp],axis=1)
+            pie = pd.concat([pie, sto[POtype][name].m],axis=1)
+            continue
+        if GeneralizedLeastSquare and PO["SD_"+POtype].isnull().all():
+            sto[POtype][name] = Station(name=name, CHEM=CHEM, hasPO=False)
+            covtmp = pd.Series(sto[POtype][name].covm,name=name) 
+            stmp= pd.Series(sto[POtype][name].m,name=name)
+            s   = pd.concat([s, stmp],axis=1)
+            cov_all = pd.concat([cov_all, covtmp],axis=1)
             pie = pd.concat([pie, sto[POtype][name].m],axis=1)
             continue
 
         # ==== Drop day with missing values
-        POunc   = PO["unc"+POtype]
-        PO      = PO[POtype]
-
-        TMP     = pd.concat([PO,POunc,CHEM],axis=1,join="inner")
+        TMP = pd.DataFrame.join(CHEM,PO[[POtype,"SD_"+POtype]],how="inner")
         TMP.dropna(inplace=True)
-
-        PO      = TMP[POtype]
-        POunc   = TMP["unc"+POtype]
-        CHEM    = TMP.ix[:,2:]
+        PO   = TMP[POtype]
+        POunc= TMP["SD_"+POtype]
+        CHEM = TMP[CHEM.columns]
+        PO.name = POunc.name = CHEM.name = name
         
+        if name == "Frenes":
+            pvalues[POtype]=pd.DataFrame(index=CHEM.columns)
         # ==== Different inversion method
         if MachineLearning:
             # Machine learning from scikit
-            m       = solve_scikit_linear_regression(X=CHEM.values, y=PO.values)
+            m       = solve_scikit_linear_regression(X=CHEM.values, y=PO.values,
+                                                    index=CHEM.columns)
             m.name  = name
+            covm    = pd.Series(index=CHEM.columns)
+        elif GeneralizedLeastSquare:
+            goForGLS = CHEM.copy()
+            regr = sm.GLS(PO, goForGLS, sigma=np.diag(np.power(POunc,2))).fit()
+            while True:
+                regr = sm.GLS(PO, goForGLS, sigma=np.diag(np.power(POunc,2))).fit()
+                # print(regr.summary())
+                if name == "Frenes":
+                    pvalues[POtype] = pd.concat([pvalues[POtype],regr.pvalues],axis=1)
+                    print(regr.summary())
+                # if (regr.pvalues > 0.05).any():
+                if (regr.params < 0).any():
+                    # Some variable are 0, drop them.
+                    # goForGLS.drop(goForGLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
+                    # goForGLS.drop(goForGLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+                    goForGLS.drop(goForGLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+                else:
+                    # Ok, the run converged
+                    break
+                if goForGLS.shape[1]==0:
+                    # All variable were droped... Pb
+                    print("Warning: The run did not converge...")
+                    break
+             
+            m = pd.Series(index=CHEM.columns, data=0)
+            m[goForGLS.columns]= regr.params
+            m.name = name
+            covm = pd.Series(index=CHEM.columns, data=0)
+            covm[goForGLS.columns] = regr.bse
+            covm.name = name
+            # print(regr.summary())
         elif OrdinaryLeastSquare:
             # Ordinary least square method (implemeted by myself)
             m, Covm, Res =  solve_lsqr(G=CHEM.as_matrix(),
-                                       d=PO.as_matrix,
+                                       d=PO.as_matrix(),
                                        Covd=np.diag(np.power(POunc.as_matrix(),2)))
+            m       = pd.Series(index=CHEM.columns, data=m)
             m.name  = name
+            covm    = pd.Series(index=m.index,data=np.sqrt(np.diag(Covm)))
+            covm.name = name
         
         # ==== Store the result
         s   = pd.concat([s,m],axis=1)
+        cov_all = pd.concat([cov_all,covm],axis=1)
         sto[POtype][name] = Station(name=name,
                                     CHEM=CHEM,
                                     PO=PO,
-                                    m=m)
+                                    POunc=POunc,
+                                    m=m,
+                                    covm=covm)
         if plotTS:
-            # plot_station(sto[POtype][name],POtype)
-            # if saveFig:
-            #     plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
-            #     plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
-            #     plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+            plot_station(sto[POtype][name],POtype)
+            if saveFig:
+                plt.savefig(OUTPUT_DIR+"svg/inversion"+name+POtype+".svg")
+                plt.savefig(OUTPUT_DIR+"pdf/inversion"+name+POtype+".pdf")
+                plt.savefig(OUTPUT_DIR+"inversion"+name+POtype+".png") 
+        if plotBar:
             plot_ts_reconstruction_PO(sto[POtype][name],POtype)
             if saveFig:
                 plt.savefig(OUTPUT_DIR+"svg/reconstructionPerSource_"+name+POtype+".svg")
@@ -204,67 +189,76 @@ for POtype in list_POtype:
         if saveResult:
             result2csv(sto[POtype][name],saveDir=SAVE_DIR,POtype=POtype)
 
-    saveCoeff[POtype] = s.ix[:,list_station]
+            with open(SAVE_DIR+"/"+name+POtype+".pickle", "wb") as handle:
+                pickle.dump(sto[POtype][name], handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-## ========== CONTRIBUTION PIE CHART ===========================================
-#f,axes = plt.subplots(nrows=len(list_POtype),ncols=len(list_station),figsize=(17,8))
-##ax.shape = (np.sum(ax.shape),) 
-#for j, row in enumerate(axes):
-#    for i, ax in enumerate(row):
-#        station=sto[list_POtype[j]][list_station[i]]
-#        if j == 0:
-#            ax.set_title(list_station[i])
-#        plot_contribPie(ax, station)
-#        if i == 0:
-#            ax.set_ylabel(list_POtype[j], {'size': '16'} )
-#            ax.yaxis.labelpad = 60
-#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-#
-#if saveFig:
-#    plt.savefig(OUTPUT_DIR+"contribAllSites.png")
-#    plt.savefig(OUTPUT_DIR+"svg/contribAllSites.svg")
-#    plt.savefig(OUTPUT_DIR+"pdf/contribAllSites.pdf")
-#
-## ========== PLOT COEFFICIENT =================================================
-#f, axes = plt.subplots(nrows=len(list_POtype),ncols=1,sharex=True,figsize=(17,8))
-#for j, ax in enumerate(axes):
-#    station = saveCoeff[list_POtype[j]]
-#    plot_coeff(station, ax=ax)
-#    ax.set_title(list_POtype[j])
-#    ax.set_ylabel("nmol/min/µg")
-#plt.legend(loc="center", bbox_to_anchor=(0.5,-0.1*len(list_POtype)),
-#           ncol=len(list_station))
-#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-#if fromSource:
-#    l   = ax.get_xticklabels() # -2 because ax[-1] is ""
-#    ax.set_xticklabels(l, rotation=10)
-#
-#if saveFig:
-#    plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
-#    plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
-#    plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
-#
-## ========== COMPARE CHEM - PO PIE CHART ========================================
-#f,axes = plt.subplots(nrows=len(list_POtype)+1,ncols=len(list_station),figsize=(17,8))
-#for j, row in enumerate(axes):
-#    for i, ax in enumerate(row):
-#        if j==0:
-#            ax.set_title(list_station[i])
-#            df = sto[list_POtype[j]][list_station[i]].pieCHEM
-#        else:
-#            df = sto[list_POtype[j-1]][list_station[i]].pie
-#        plot_contribPie(ax, df)
-#        if i == 0:
-#            if j == 0:
-#                ax.set_ylabel("Mass", {'size': '16'} )
-#            else:
-#                ax.set_ylabel(list_POtype[j-1], {'size': '16'} )
-#            ax.yaxis.labelpad = 50
-#plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
-#
-#if saveFig:
-#    plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
-#    plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
-#    plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
+    saveCoeff[POtype] = s.ix[:,list_station]
+    saveCovm[POtype] = cov_all.ix[:,list_station]
+
+
+if plotAll:
+    # ========== CONTRIBUTION PIE CHART ===========================================
+    f,axes = plt.subplots(nrows=len(list_POtype),ncols=len(list_station),figsize=(17,8))
+    #ax.shape = (np.sum(ax.shape),) 
+    for j, row in enumerate(axes):
+        for i, ax in enumerate(row):
+            station=sto[list_POtype[j]][list_station[i]]
+            if j == 0:
+                ax.set_title(list_station[i])
+            plot_contribPie(ax, station)
+            if i == 0:
+                ax.set_ylabel(list_POtype[j], {'size': '16'} )
+                ax.yaxis.labelpad = 60
+    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+
+    if saveFig:
+        plt.savefig(OUTPUT_DIR+"contribAllSites.png")
+        plt.savefig(OUTPUT_DIR+"svg/contribAllSites.svg")
+        plt.savefig(OUTPUT_DIR+"pdf/contribAllSites.pdf")
+
+    # ========== PLOT COEFFICIENT =================================================
+    f, axes = plt.subplots(nrows=len(list_POtype),ncols=1,sharex=True,figsize=(17,8))
+    for j, ax in enumerate(axes):
+        coeff = saveCoeff[list_POtype[j]]
+        covm  = saveCovm[list_POtype[j]]
+        plot_coeff(coeff, yerr=covm, ax=ax)
+        ax.set_title(list_POtype[j])
+        ax.set_ylabel("nmol/min/µg")
+        plt.legend(loc="center", bbox_to_anchor=(0.5,-0.15*len(list_POtype)),
+                   ncol=len(list_station))
+        plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+        if fromSource:
+            # l   = ax.get_xticklabels() # -2 because ax[-1] is ""
+            l   = coeff.index # -2 because ax[-1] is ""
+            l = [l.replace("_"," ") for l in l]
+            ax.set_xticklabels(l, rotation=-10)
+
+    if saveFig:
+        plt.savefig(OUTPUT_DIR+"coeffAllSites.png")
+        plt.savefig(OUTPUT_DIR+"svg/coeffAllSites.svg")
+        plt.savefig(OUTPUT_DIR+"pdf/coeffAllSites.pdf")
+
+    # ========== COMPARE CHEM - PO PIE CHART ========================================
+    f,axes = plt.subplots(nrows=len(list_POtype)+1,ncols=len(list_station),figsize=(17,8))
+    for j, row in enumerate(axes):
+        for i, ax in enumerate(row):
+            if j==0:
+                ax.set_title(list_station[i])
+                df = sto[list_POtype[j]][list_station[i]].pieCHEM
+            else:
+                df = sto[list_POtype[j-1]][list_station[i]].pie
+            plot_contribPie(ax, df)
+            if i == 0:
+                if j == 0:
+                    ax.set_ylabel("Mass", {'size': '16'} )
+                else:
+                    ax.set_ylabel(list_POtype[j-1], {'size': '16'} )
+                ax.yaxis.labelpad = 50
+    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
+
+    if saveFig:
+       plt.savefig(OUTPUT_DIR+"compareCHEM-PO_AllSites.png")
+       plt.savefig(OUTPUT_DIR+"svg/compareCHEM-PO_AllSites.svg")
+       plt.savefig(OUTPUT_DIR+"pdf/compareCHEM-PO_AllSites.pdf")
 
 
