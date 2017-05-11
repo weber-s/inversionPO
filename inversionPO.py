@@ -15,26 +15,26 @@ from misc_utility.load_data import *
 
 
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD/BdD_PO/"
-OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionGLS/"
-SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionGLS/"
+OUTPUT_DIR= "/home/samuel/Documents/IGE/inversionPO/figures/inversionLARS/"
+SAVE_DIR  = "/home/samuel/Documents/IGE/inversionPO/results/inversionLARS/"
 list_station= ["Nice","Frenes","Passy","Chamonix", "Marnaz"]
-# list_station= ["Nice"]
+# list_station= ["Passy"]
 
-list_POtype = ["AAv","DTTv"]
+list_POtype = ["DTTv","AAv"]
 
 # plt.interactive(True)
 
 OrdinaryLeastSquare     = False
-GeneralizedLeastSquare  = True
-MachineLearning         = False
+GeneralizedLeastSquare  = False
+MachineLearning         = True 
 
 fromSource  = True
 saveFig     = True
 plotTS      = True
-plotBar     = False
+plotBar     = True
 saveResult  = True
-sum_sources = False
-plotAll     = False
+sum_sources = True
+plotAll     = True
 
 if fromSource:
     name_File="_ContributionsMass_positive.csv"
@@ -124,10 +124,10 @@ for POtype in list_POtype:
             m.name  = name
             covm    = pd.Series(index=CHEM.columns)
         elif GeneralizedLeastSquare:
-            goForGLS = CHEM.copy()
-            regr = sm.GLS(PO, goForGLS, sigma=np.diag(np.power(POunc,2))).fit()
+            goForWLS = CHEM.copy()
+            regr = sm.WLS(PO, goForWLS, sigma=POunc**2).fit()
             while True:
-                regr = sm.GLS(PO, goForGLS, sigma=np.diag(np.power(POunc,2))).fit()
+                regr = sm.WLS(PO, goForWLS, sigma=POunc**2).fit()
                 # print(regr.summary())
                 if name == "Frenes":
                     pvalues[POtype] = pd.concat([pvalues[POtype],regr.pvalues],axis=1)
@@ -135,22 +135,22 @@ for POtype in list_POtype:
                 # if (regr.pvalues > 0.05).any():
                 if (regr.params < 0).any():
                     # Some variable are 0, drop them.
-                    # goForGLS.drop(goForGLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
-                    # goForGLS.drop(goForGLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
-                    goForGLS.drop(goForGLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+                    # goForWLS.drop(goForWLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
+                    # goForWLS.drop(goForWLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+                    goForWLS.drop(goForWLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
                 else:
                     # Ok, the run converged
                     break
-                if goForGLS.shape[1]==0:
+                if goForWLS.shape[1]==0:
                     # All variable were droped... Pb
                     print("Warning: The run did not converge...")
                     break
              
             m = pd.Series(index=CHEM.columns, data=0)
-            m[goForGLS.columns]= regr.params
+            m[goForWLS.columns]= regr.params
             m.name = name
             covm = pd.Series(index=CHEM.columns, data=0)
-            covm[goForGLS.columns] = regr.bse
+            covm[goForWLS.columns] = regr.bse
             covm.name = name
             # print(regr.summary())
         elif OrdinaryLeastSquare:
