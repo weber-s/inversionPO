@@ -3,8 +3,6 @@ figures
 __pycache__
 *.pyc
 sites.pdf
-inversionPO.m
 pdf
 svg
-figures
 results

@@ -24,7 +24,7 @@ def solve_lsqr(G=None, d=None, Covd=None):
     return m, Covm, Res
 
 def solve_inversion_LP(d, G, std, x_min=None, x_max=None):
-    x   = pulp.LpVariable.dicts("PO", G.columns, x_min, x_max)
+    x   = pulp.LpVariable.dicts("OP", G.columns, x_min, x_max)
     m   = pulp.LpVariable("to_minimize", 0)
     lp_prob = pulp.LpProblem("Minmax Problem", pulp.LpMinimize)
     lp_prob += m, "Minimize_the_maximum"
@@ -66,9 +66,76 @@ def solve_scikit_linear_regression(X=None, y=None, index=None):
         m = regr.coef_
     return m
 
-def solve_statsmodels_linear_regression(X=None, y=None, sigma=None):
+def solve_GLS(X=None, y=None, sigma=None):
     """
-    Solve a multiple linear problem using statsmodels OLS
+    Solve a multiple linear problem using statsmodels GLS
     """
-    regr = sm.GLS(y, X, sigma=sigma)
+    goForGLS = X.copy()
+    regr = sm.GLS(y, goForGLS, sigma=sigma).fit()
+    while True:
+        regr = sm.GLS(y, goForGLS, sigma=sigma).fit()
+        # if (regr.pvalues > 0.05).any():
+        if (regr.params < 0).any():
+            # Some variable are 0, drop them.
+            # goForGLS.drop(goForGLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
+            # goForGLS.drop(goForGLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+            goForGLS.drop(goForGLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+        else:
+            # Ok, the run converged
+            break
+        if goForGLS.shape[1]==0:
+            # All variable were droped... Pb
+            print("Warning: The run did not converge...")
+            break
+    # print(regr.summary())
     return regr
+
+def solve_WLS(X=None, y=None, sigma=None):
+    """
+    Solve a multiple linear problem using statsmodels WLS
+    """
+    goForWLS = X.copy()
+    regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
+    while True:
+        regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
+        # if (regr.pvalues > 0.05).any():
+        if (regr.params < 0).any():
+            # Some variable are 0, drop them.
+            # goForWLS.drop(goForWLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
+            # goForWLS.drop(goForWLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+            goForWLS.drop(goForWLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+        else:
+            # Ok, the run converged
+            break
+        if goForWLS.shape[1]==0:
+            # All variable were droped... Pb
+            print("Warning: The run did not converge...")
+            break
+    # print(regr.summary())
+    return regr
+
+def solve_OLS(X=None, y=None, sigma=None):
+    """
+    Solve a multiple linear problem using statsmodels WLS
+    """
+    goForWLS = X.copy()
+    regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
+    while True:
+        regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
+        # if (regr.pvalues > 0.05).any():
+        if (regr.params < 0).any():
+            # Some variable are 0, drop them.
+            # goForWLS.drop(goForWLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
+            # goForWLS.drop(goForWLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+            goForWLS.drop(goForWLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+        else:
+            # Ok, the run converged
+            break
+        if goForWLS.shape[1]==0:
+            # All variable were droped... Pb
+            print("Warning: The run did not converge...")
+            break
+    # print(regr.summary())
+    return regr
+
+
