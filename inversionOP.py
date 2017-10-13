@@ -1,40 +1,37 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-#import sklearn
-from scipy import linalg, polyfit
-#import pulp
-import pickle
-from sklearn import linear_model
+from statsmodels.sandbox.regression.predstd import wls_prediction_std
+from sklearn.model_selection import train_test_split
 from customClass import *
+from itertools import product
 from misc_utility.plot_utility import *
-from misc_utility.save_utility import result2csv
+from misc_utility.save_utility import *
 from misc_utility.solvers import *
 from misc_utility.load_data import *
-from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 
 
-INPUT_DIR = "/home/samuel/Documents/IGE/BdD/BdD_OP/"
+INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
-# list_station= ["Nice","Frenes","Passy","Chamonix", "Marnaz"]
-list_station= ["ANDRA","Nice","Frenes","Passy","Chamonix",
-               "Marnaz","Marseille","PdB"]
-# list_station= ["Marseille","Frenes","Nice","PdB"]
+# list_station= ["ANDRA","Nice","Frenes","Passy","Chamonix","Marnaz","Marseille","PdB"]
+list_station= ["Chamonix"]
 
-# list_OPtype = ["AAv","DTTv","DCFHv"]
 list_OPtype = ["AAv","DTTv"]
 
 # format to save plot
 fmt_save    =["png","pdf","svg"]
 
 
-plt.interactive(False)
+plt.interactive(True)
 
 # Choose the inversion method (could be OLS, WLS, GLS or ML)
 inversion_method = "WLS"
-OUTPUT_DIR="/home/samuel/Documents/IGE/inversionOP/figures/inversion"+inversion_method+"_wo_outliers/"
-SAVE_DIR="/home/samuel/Documents/IGE/inversionOP/results/inversion"+inversion_method+"_wo_outliers/"
+OUTPUT_DIR="/home/webersa/Documents/inversionOP/figures/inversion"+inversion_method+"_wo_outliers/"
+SAVE_DIR="/home/webersa/Documents/inversionOP/results/inversion"+inversion_method+"_wo_outliers/"
+
+# OUTPUT_DIR="/home/webersa/Documents/IGE/inversionOP/figures/inversion"+inversion_method+"_DECOMBIO/"
+# SAVE_DIR="/home/webersa/Documents/IGE/inversionOP/results/inversion"+inversion_method+"_DECOMBIO/"
 
 fromSource  = True
 saveFig     = False
@@ -42,143 +39,104 @@ plotTS      = False
 plotBar     = False
 plotRegplot = False
 saveResult  = False
-sum_sources = False
+sum_sources = True
 plotAll     = False
+
+# Number of bootstrap run
+NBOOT = 1000
 
 # sort list in order to always have the same order
 list_station.sort()
 list_OPtype.sort()
+
 # initialize stuff
 sto = dict()
 for OPtype in list_OPtype:
-    sto[OPtype]=dict()
-    print("=============="+OPtype+"====================")
-    pie = pd.Series()
-    for name in list_station:
-        print("=============="+name+"====================")
-        CHEM = load_CHEMorOP(name, INPUT_DIR, CHEMorOP="CHEM", fromSource=fromSource)
-        OP   = load_CHEMorOP(name, INPUT_DIR, CHEMorOP="OP")
+    sto[OPtype] = dict()
+sources = list() # list of all the sources
 
-        if not(fromSource):
-            # select the species we want
-            colOK   = ("OC","EC",\
-                       "Na+","NH4+","K+","Mg2+","Ca2+","MSA","Cl-","NO3-","SO42-","Oxalate",\
-                       "Levoglucosan","Levoglusan","Polyols","ΣPolyols",\
-                       "As","Ba","Cd","Cu","Hg","Mn","Mo","Ni","Pb","Sb","Sn","Ti","Zn","Al","Fe","Ag"\
-                       "ΣHAP","ΣHOP","Σmethoxy_part")
-            CHEM    = CHEM.ix[:,colOK]
-            CHEM.dropna(axis=1, how="all", inplace=True)
-        else:
-            # rename columns
-            CHEM = setSourcesCategories(CHEM)
-            CHEM.sort_index(axis=1, inplace=True)
-            if sum_sources:
-                # print(CHEM)
-                to_merge =["Bio_burning", "Bio_burning1","Bio_burning2",\
-                          "Vehicular", "Vehicular_ind","Vehicular_dir"]
-                for i in range(0,int(len(to_merge)/3)+3,3):
-                    try:
-                        CHEM[to_merge[i]] = CHEM[to_merge[i+1:i+3]].sum(axis=1)
-                        CHEM.drop(to_merge[i+1:i+3], axis=1,inplace=True)
-                    except:
-                        pass
-                        # print("The sources {merge} are not in the site {site}".format(merge=to_merge[i+1:i+3], site=name))
-
-            # CHEM = CHEM.div(CHEM.sum(axis=1),axis="index")
-
-        if not(OPtype in OP.columns) or OP[OPtype].isnull().all():
-            sto[OPtype][name] = Station(name=name, CHEM=CHEM, hasOP=False)
-            pie = pd.concat([pie, sto[OPtype][name].m],axis=1)
-            continue
-        if (inversion_method in "OLS|WLS|GLS") and OP["SD_"+OPtype].isnull().all():
-            sto[OPtype][name] = Station(name=name, CHEM=CHEM, hasOP=False)
-            pie     = pd.concat([pie, sto[OPtype][name].m],axis=1)
+OPandStation = product(list_OPtype, list_station)
+# for OPtype, name in OPandStation:
+for name in list_station:
+    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_SRC_Florie.csv",
+                     OPfile="_OP.csv", list_OPtype=list_OPtype)
+    station.load_SRC()
+    station.load_OP()
+    station.setSourcesCategories()
+    station.SRC.sort_index(axis=1, inplace=True)
+    station.OPi = pd.DataFrame(index=station.SRC.columns, columns=list_OPtype)
+    if sum_sources:
+        station.mergeSources(inplace=True)
+    for OPtype in list_OPtype:
+        if not(OPtype in station.OP.columns) or station.OP[OPtype].isnull().all():
+            # we didn't measure this OP
+            # so save it and continue
+            sto[OPtype][name] = station
             continue
 
         # ==== Drop days with missing values
-        TMP = pd.DataFrame.join(CHEM,OP[[OPtype,"SD_"+OPtype]],how="inner")
+        TMP     = station.SRC.merge(station.OP[[OPtype,"SD_"+OPtype]], left_index=True,
+                                    right_index=True, how="inner")
         TMP.dropna(inplace=True)
-        OP   = TMP[OPtype]
-        OPunc= TMP["SD_"+OPtype]
-        CHEM = TMP[CHEM.columns]
+        OP      = TMP[OPtype]
+        OPunc   = TMP["SD_"+OPtype]
+        CHEM    = TMP[station.SRC.columns]
         OP.name = OPunc.name = CHEM.name = name
-        
 
         # ==== Different inversion method
-        if inversion_method == "ML":
-            # Machine learning from scikit
-            m       = solve_scikit_linear_regression(X=CHEM.values, y=OP.values,
-                                                    index=CHEM.columns)
-            m.name  = name
-            covm    = pd.Series(index=CHEM.columns)
-            yerr    = None
-        elif inversion_method == "GLS":
-            regr    = solve_GLS(X=CHEM, y=OP, sigma=1/OPunc**2)
-            # print(regr.summary())
+        # Here we choose the WLS
+        regr    = solve_WLS(X=CHEM, y=OP, sigma=1/OPunc**2)
+        station.reg[OPtype] = regr
+        # print(regr.summary())
+        station.OPi.loc[:,OPtype] = regr.params[1:]
+        station.OPi.loc[:,"SD_"+OPtype] = regr.bse[1:]
 
-            m = pd.Series(index=CHEM.columns, data=0)
-            m[regr.params.index]= regr.params
-            m.name = name
-            covm = pd.Series(index=CHEM.columns, data=0)
-            covm[regr.params.index] = regr.bse
-            covm.name = name
-            yerr    = None
-
-        elif inversion_method == "WLS":
-            regr    = solve_WLS(X=CHEM, y=OP, sigma=1/OPunc**2)
-            # print(regr.summary())
-         
-            m = pd.Series(index=CHEM.columns, data=0)
-            m[regr.params.index]= regr.params
-            m.name = name
-            covm = pd.Series(index=CHEM.columns, data=0)
-            covm[regr.params.index] = regr.bse
-            covm.name = name
-
-            yerr, iv_l, iv_l = wls_prediction_std(regr)
-
-        elif inversion_method == "OLS":
-            # Ordinary least square method (implemeted by myself)
-            m, Covm, Res =  solve_lsqr(G=CHEM.as_matrix(),
-                                       d=OP.as_matrix(),
-                                       Covd=np.diag(np.power(OPunc.as_matrix(),2)))
-            m       = pd.Series(index=CHEM.columns, data=m)
-            m.name  = name
-            covm    = pd.Series(index=m.index,data=np.sqrt(np.diag(Covm)))
-            covm.name = name
-            yerr    = None
-        else:
-            print("Choose an inversion method")
-        
+        # Bootstrap the solution in order to estimate the model uncertainties
+        pred = pd.DataFrame(index=CHEM.index)
+        for i in list(range(0,NBOOT)):
+            params = regr.bse * np.random.randn(len(regr.params))+regr.params
+            pred[i] = (params*CHEM).sum(axis=1)
+        station.OPmodel_unc[OPtype] = pred.std(axis=1)
+        station.OPmodel[OPtype] = (station.SRC * station.OPi[OPtype]).sum(axis=1)
         # ==== Store the result
-        sto[OPtype][name] = Station(name=name,
-                                    CHEM=CHEM, OP=OP, OPunc=OPunc,
-                                    m=m, covm=covm, yerr=yerr, reg=regr)
+        # sto[OPtype][name] = Station(name=name,
+        #                             CHEM=CHEM, OP=OP, OPunc=OPunc, OPtype=OPtype,
+        #                             OPi=OPi, covm=covm, yerr=yerr, reg=regr)
 
+    if saveResult:
+        with open(SAVE_DIR+"/"+name+OPtype+".pickle", "wb") as handle:
+            pickle.dump(sto[OPtype][name], handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+# sources = setSourcesCategories(sources).sort()
+# multiIndex = pd.MultiIndex.from_product([list_OPtype,sources],
+#                                         names=["OPtype","Sources"])
+# saveCoeff = pd.DataFrame(data=0.0, columns=list_station, index=multiIndex)
+# saveCovm  = pd.DataFrame(data=0.0, columns=list_station, index=multiIndex)
+# for OPtype in list_OPtype:
+#     df =  pd.concat([sto[OPtype][name].OPi for name in list_station], axis=1)
+#     df["Sources"] = df.index
+#     saveCoeff.loc[OPtype][:]= df.set_index("Sources",drop=True)
+#     df  = pd.concat([sto[OPtype][name].covm for name in list_station], axis=1)
+#     df["Sources"] = df.index
+#     saveCovm.loc[OPtype][:]= df.set_index("Sources",drop=True)
+#
+if plotTS or plotBar:
+    for OPtype, name in product(list_OPtype, list_station):
+        if saveResult:
+            with open(SAVE_DIR+"/"+name+OPtype+".pickle", "rb") as file:
+                station = pickle.load(file)
+        else:
+            station = sto[OPtype][name]
         if plotTS:
-            plot_station(sto[OPtype][name],OPtype)
+            plot_station(station,OPtype)
             if saveFig:
                 plot_save("inversion"+name+OPtype, OUTPUT_DIR, fmt=fmt_save)
         if plotBar:
-            plot_ts_reconstruction_OP(sto[OPtype][name],OPtype)
+            plot_ts_reconstruction_OP(station,OPtype)
             if saveFig:
                 plot_save("reconstructionPerSource_"+name+OPtype, OUTPUT_DIR,
                           fmt=fmt_save)
-
-
-        if saveResult:
-            result2csv(sto[OPtype][name],saveDir=SAVE_DIR,OPtype=OPtype)
-
-            with open(SAVE_DIR+"/"+name+OPtype+".pickle", "wb") as handle:
-                pickle.dump(sto[OPtype][name], handle, protocol=pickle.HIGHEST_PROTOCOL)
-        plt.close("all")
-
-saveCoeff = dict()
-saveCovm = dict()
-for OPtype in list_OPtype:
-    saveCoeff[OPtype] = pd.concat([sto[OPtype][name].m for name in list_station], axis=1)
-    saveCovm[OPtype] = pd.concat([sto[OPtype][name].covm for name in list_station], axis=1)
-
 if plotRegplot:
     for name in list_station:
         X = sto[list_OPtype[0]][name].CHEM
@@ -209,8 +167,8 @@ if plotAll:
 
     # ========== PLOT COEFFICIENT =================================================
     f, axes = plt.subplots(nrows=len(list_OPtype),ncols=1,sharex=True,figsize=(17,8))
-    for j, OP_type in enumerate(list_OPtype):
-        plot_all_coeff(list_station, OP_type, SAVE_DIR, axes[j])
+    for j, OPtype in enumerate(list_OPtype):
+        plot_all_coeff(list_station, OPtype, SAVE_DIR, axes[j])
     plt.legend(loc="center", bbox_to_anchor=(0.5,-0.15*len(list_OPtype)),
                    ncol=len(list_station))
     plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
@@ -231,9 +189,10 @@ if plotAll:
         for i, ax in enumerate(row):
             if j==0:
                 ax.set_title(list_station[i])
-                df = sto[list_OPtype[j]][list_station[i]].pieCHEM
+                df = sto[list_OPtype[j]][list_station[i]].CHEM
             else:
-                df = sto[list_OPtype[j-1]][list_station[i]].pie
+                df = sto[list_OPtype[j-1]][list_station[i]].CHEM\
+                        * sto[list_OPtype[j-1]][list_station[i]].OPi
             plot_contribPie(ax, df)
             if i == 0:
                 if j == 0:
@@ -262,8 +221,9 @@ if plotAll:
             else:
                 plot_seasonal_contribution(sto[plot][name], OPtype=plot,
                                            CHEMorOP="OP",ax=axes[i])    
-            # if i==2:
-            axes[i].legend("")
+            if i==2:
+                axes[i].legend("")
 
             axes[i].set_xlabel(" ")
-        plot_save("Normalized_contribution_"+name, OUTPUT_DIR, fmt=["png","pdf"])
+        if saveFig:
+            plot_save("Normalized_contribution_"+name, OUTPUT_DIR, fmt=["png","pdf"])

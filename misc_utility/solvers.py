@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
-import pulp
+# import pulp
 from sklearn import linear_model
 import statsmodels.api as sm 
+from statsmodels.tools.tools import add_constant
 
 def solve_lsqr(G=None, d=None, Covd=None):
     # G   = G.as_matrix()
@@ -94,7 +95,7 @@ def solve_WLS(X=None, y=None, sigma=None):
     """
     Solve a multiple linear problem using statsmodels WLS
     """
-    goForWLS = X.copy()
+    goForWLS = add_constant(X.copy())
     regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
     while True:
         regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()

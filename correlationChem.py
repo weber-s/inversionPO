@@ -28,17 +28,19 @@ list_station : the names of the station to plot. It has to be the name of the
 """
 
 INPUT_DIR = "/home/samuel/Documents/IGE/BdD/BdD_OP/"
-colOK   = ("OC","EC",\
-           "Na+","NH4+","K+","Mg2+","Ca2+","MSA","Cl-","NO3-","SO42-","Ox",\
-           "Levoglucosan","ΣPolyols",\
-           "Al","As","Ba","Cd","Cu","Fe","Mn","Mo","Ni","Pb","Sb","Sn","Ti","Zn",\
+colOK   = ("OCwb*","OCautres*","BCwb","BCff",\
+           "Na+","NH4+","K+","Mg2+","Ca2+","Cl-","NO3-","SO42-",\
+           "Levoglucosan","ΣPolyols","MSA",\
+           "As","Cu","Fe","Mn","Mo","Ni","Pb","Rb","Sb","Ti","V","Zn","Zr",\
+           # "Al","As","Ba","Cd","Cu","Fe","Mn","Mo","Ni","Pb","Sb","Sn","Ti","Zn",\
            # "Al","As","Ba","Cd","Ce","Co","Cr","Cu","Fe","La","Li","Mn","Mo","Ni","Pb","Rb","Sb","Se","Sn","Sr","Ti","Tl","V","Zn","Zr",\
-           "ΣHAP","ΣHOP","HULIS","DOC")
+           # "ΣHAP","ΣHOP","HULIS","DOC")
+           "ΣHOP","Σmethoxy","PM10")
 # colOK = ("Levoglucosan","ΣPolyols","MSA","Cu","Fe","Ox","NO3-","SO42-","ΣHOP","EC")
 keep = ["DTTv","AAv"]
 
-list_station=["ANDRA","PdB","Marseille","Nice","Frenes","Chamonix","Marnaz","Passy"]
-# list_station=["Chamonix",]
+# list_station=["ANDRA","PdB","Marseille","Nice","Frenes","Chamonix","Marnaz","Passy"]
+list_station=["Chamonix",]
 # initialize the figure
 f = plt.figure(figsize=(7.41,  5.59))
 # set the color map + missing value in lightgrey
@@ -61,7 +63,7 @@ for i, name in enumerate(list_station):
     # select only the raws of the OP, and skip the column of auto-correlation
     # OP/OP, i.e. a correlation of 1.
     corr    = TMP.corr().ix[keep,:-len(keep)]
-    
+
     # plot the correlation matrix
     plt.subplot(len(list_station),1,i+1)
     im = plt.imshow(corr, cmap=cmap, vmin=-1, vmax=1)

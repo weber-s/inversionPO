@@ -14,6 +14,6 @@ def result2csv(station,saveDir=None,OPtype=None):
     
     save_name = saveDir + station.name + "_contribution_"+OPtype+".csv"
 
-    df = station.CHEM * station.m
+    df = station.CHEM * station.OPi
     df.to_csv(save_name)
 
