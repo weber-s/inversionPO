@@ -98,6 +98,8 @@ for name in list_station:
             pred[i] = (params*CHEM).sum(axis=1)
         station.OPmodel_unc[OPtype] = pred.std(axis=1)
         station.OPmodel[OPtype] = (station.SRC * station.OPi[OPtype]).sum(axis=1)
+        station.get_ODR_result(OPtype=OPtype)
+        station.get_pearson_r(OPtype)
         # ==== Store the result
         # sto[OPtype][name] = Station(name=name,
         #                             CHEM=CHEM, OP=OP, OPunc=OPunc, OPtype=OPtype,

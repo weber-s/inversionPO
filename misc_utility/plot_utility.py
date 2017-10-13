@@ -146,18 +146,19 @@ def plot_corr(df,title=None, alreadyDone=False, ax=None, **kwarg):
 
     return ax
 
-def plot_scatterReconsObs(ax, station=None, obs=None, model=None, p=None,
-                          pearson_r=None, xerr=None, yerr=None):
+def plot_scatterReconsObs(ax, station=None, OPtype=None, obs=None, model=None, p=None,
+                          pearsonr=None, xerr=None, yerr=None):
     """
     Scatter plot between the observation and the model.
     """
     if station is not None:
-        obs     = station.OP
-        model   = station.model
-        p       = station.p
-        pearson_r= station.pearson_r
-        xerr    = station.OPunc
-        yerr    = station.yerr
+        idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
+        obs     = station.OP.loc[idx, OPtype]
+        model   = station.OPmodel.loc[idx, OPtype]
+        p       = station.get_ODR_result(OPtype)
+        pearsonr= station.pearsonr[OPtype][0]
+        xerr    = station.OP.loc[idx, "SD_"+OPtype]
+        yerr    = station.OPmodel_unc.loc[idx, OPtype]
     
     # pd.concat((obs,model), axis=1).plot(ax=ax,x=[0], y=[1], kind="scatter")
     ax.errorbar(x=obs, y=model, xerr=xerr, yerr=yerr, label="", 
@@ -172,8 +173,9 @@ def plot_scatterReconsObs(ax, station=None, obs=None, model=None, p=None,
     ax.set_aspect("equal","box")
     ax.plot([0,obs.max()],[0, obs.max()], '--', label="y=x")
     ax.plot([0,obs.max()],[p[1], p[0]*obs.max()+p[1]], label="linear fit")
+    print(pearsonr)
     ax.text(0.05,0.75,
-            "y={:.2f}x{:+.2f}\npearson r={:.2f}".format(p[0],p[1],pearson_r[0,1]),
+            "y={:.2f}x{:+.2f}\npearson r={:.2f}".format(p[0],p[1],pearsonr),
             transform=ax.transAxes)
     ax.set_xlabel("Obs.")
     ax.set_ylabel("Recons.")
@@ -216,8 +218,11 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
     """Plot the time series obs/model"""
     if ax == None:
         ax = plt.subplot()
-    ax.errorbar(station.OP[OPtype].index.to_pydatetime(), station.OP[OPtype],
-                yerr=station.OP["SD_"+OPtype], 
+
+    idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
+    ax.errorbar(idx,
+                station.OP.loc[idx, OPtype],
+                yerr=station.OP.loc[idx, "SD_"+OPtype], 
                 color="#1f77b4",
                 ecolor="black",
                 elinewidth=1,
@@ -227,13 +232,13 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
                 label="Obs.",
                 zorder=5)
     if station.OPmodel_unc[OPtype] is not None:
-        ax.fill_between(station.OPmodel[OPtype].index.to_datetime(), 
-                        station.OPmodel[OPtype] - station.OPmodel_unc[OPtype],
-                        station.OPmodel[OPtype] + station.OPmodel_unc[OPtype],
+        ax.fill_between(idx, 
+                        station.OPmodel.loc[idx, OPtype] - station.OPmodel_unc.loc[idx, OPtype],
+                        station.OPmodel.loc[idx, OPtype] + station.OPmodel_unc.loc[idx, OPtype],
                         alpha=0.4, edgecolor='#FF7F0E', facecolor='#FF7F0E',
                         zorder=1)
-    ax.plot_date(station.OPmodel[OPtype].index.to_pydatetime(),
-                 station.OPmodel[OPtype], "r-*",
+    ax.plot_date(idx,
+                 station.OPmodel.loc[idx, OPtype], "r-*",
                  linewidth=2, label="Recons.",zorder=10, color="#FF7F0E")
     ax.axis(ymin=max(ax.axis()[2],-1))
     ax.set_ylabel("{OP} loss\n[nmol/min/m³]".format(OP=OPtype[:-1]))
@@ -255,18 +260,18 @@ def plot_station(station,OPtype,**kwarg):
     plot_timeserie_obsvsmodel(station, OPtype, ax=ax)
     # scatter plot reconstruction/observation
     ax=plt.subplot(2,3,4)
-    plot_scatterReconsObs(ax, station)
+    plot_scatterReconsObs(ax, station, OPtype=OPtype)
     # factors contribution
     ax=plt.subplot(2,3,5)
-    plot_coeff(station, ax=ax)
+    plot_coeff(station, OPtype=OPtype, ax=ax)
     plt.ylabel("OP [nmol/min/µg]")
     # Pie chart
     ax=plt.subplot(2,3,6)
-    plot_contribPie(ax, station,**kwarg)
+    plot_contribPie(ax, station, OPtype=OPtype, **kwarg)
 
     plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
-def plot_contribPie(ax, station, fromSource=True, title=None, **kwarg):
+def plot_contribPie(ax, station, OPtype=None, fromSource=True, title=None, **kwarg):
     """
     Plot contributions of the sources to the OP in a Pie chart
     The contributions is G*m.
@@ -275,15 +280,14 @@ def plot_contribPie(ax, station, fromSource=True, title=None, **kwarg):
     if isinstance(station, pd.DataFrame):
         df = station.sum()
     else:
-         if not(station.hasOP):
-             return
-         df = pd.Series((station.CHEM*station.OPi).sum(), name=station.name)
+        if not station.OP[OPtype].any():
+            return
+        df = pd.Series((station.SRC * station.OPi[OPtype]).sum(), name=station.name)
     
     # add color to the sources
-    if fromSource:
-        c = sourcesColor()
-        cols = c.ix["color",df.index].values
-        kwarg["colors"] = cols
+    c = sourcesColor()
+    cols = c.ix["color",df.index].values
+    kwarg["colors"] = cols
 
     ax.set_aspect('equal')
     # plot the pie plot
@@ -292,26 +296,28 @@ def plot_contribPie(ax, station, fromSource=True, title=None, **kwarg):
                     startangle=90,
                     **kwarg)
     
-    ax.set_xlabel(ax.get_xlabel().replace("_"," "))
-
     if title is not None:
         ax.set_title(title)
     ax.set_ylabel("")
 
-def plot_coeff(stations, yerr=None, ax=None):
+def plot_coeff(station, OPtype, yerr=None, ax=None):
     """Plot a bar plot of the intrinsic OP of the sources for the station(s)"""
     if ax==None:
-        ax = plt.subplots(row=len(OPtype_list), columns=len(stations.keys()))
+        ax = plt.subplots(row=len(OPtype_list), columns=len(station.keys()))
 
     c = sitesColor()
     cols = list()
-    try:
-        for s in stations:
-            cols.append(c.ix["color"][s])
-        stations.plot.bar(ax=ax, yerr=yerr, legend=False, color=cols,rot=30)
-    except TypeError:
-        cols.append(c.ix["color"][stations.name])
-        stations.OPi.plot.bar(ax=ax, yerr=stations.covm, legend=False, color=cols)
+    if hasattr(station, "name"):
+        cols.append(c.ix["color"][station.name])
+        station.OPi[OPtype].plot.bar(ax=ax, yerr=station.OPi["SD_"+OPtype],
+                                     legend=False, color=cols)
+    # try:
+    #     for s in stations:
+    #         cols.append(c.ix["color"][s])
+    #     stations.plot.bar(ax=ax, yerr=yerr, legend=False, color=cols,rot=30)
+    # except TypeError:
+    #     cols.append(c.ix["color"][stations.name])
+    #     stations.OPi.plot.bar(ax=ax, yerr=stations.covm, legend=False, color=cols)
 
 def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
     """

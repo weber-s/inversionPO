@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy import odr
+import scipy.stats as stats
 
 class Station:
     """
@@ -30,7 +31,7 @@ class Station:
         self.reg    = {}
 
         self.OPmodel = pd.DataFrame(columns=list_OPtype)
-        self.pearson_r = None
+        self.pearsonr = pd.DataFrame(columns=list_OPtype)
 
         self.odr = None
         self.odr_coeff = None
@@ -193,13 +194,27 @@ class Station:
         else:
             return df_merged
 
-    def get_ODR_result(self, x=None, y=None, sx=None, sy=None):
+    def get_ODR_result(self, OPtype, x=None, y=None, sx=None, sy=None):
         if x == None:
-            data = odr.RealData(self.OP, self.model, sx=self.OPunc, sy=self.yerr)
+            idx = self.OP[OPtype].index.intersection(self.OPmodel[OPtype].index)
+            data = odr.RealData(self.OP.loc[idx, OPtype],
+                                self.OPmodel.loc[idx, OPtype],
+                                sx=self.OP.loc[idx, "SD_"+OPtype],
+                                sy=self.OPmodel_unc.loc[idx, OPtype])
         else:
             data = odr.RealData(x, y, sx, sy)
         myodr  = odr.ODR(data, odr.unilinear)
         output = myodr.run()
-        return output
+        self.odr = myodr
+        self.odr_coeff = output.beta
+        return output.beta
+
+    def get_pearson_r(self, OPtype):
+        idx = self.OP[OPtype].index.intersection(self.OPmodel[OPtype].index)
+        pearson = stats.pearsonr(self.OP.loc[idx, OPtype],
+                                 self.OPmodel.loc[idx, OPtype])
+        self.pearsonr[OPtype] = pearson
+        return pearson
+
 
 
