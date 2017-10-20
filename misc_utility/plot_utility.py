@@ -286,7 +286,7 @@ def plot_contribPie(ax, station, OPtype=None, fromSource=True, title=None, **kwa
     
     # add color to the sources
     c = sourcesColor()
-    cols = c.ix["color",df.index].values
+    cols = c.loc["color",df.index].values
     kwarg["colors"] = cols
 
     ax.set_aspect('equal')
@@ -308,15 +308,15 @@ def plot_coeff(station, OPtype, yerr=None, ax=None):
     c = sitesColor()
     cols = list()
     if hasattr(station, "name"):
-        cols.append(c.ix["color"][station.name])
+        cols.append(c.loc["color"][station.name])
         station.OPi[OPtype].plot.bar(ax=ax, yerr=station.OPi["SD_"+OPtype],
                                      legend=False, color=cols)
     # try:
     #     for s in stations:
-    #         cols.append(c.ix["color"][s])
+    #         cols.append(c.loc["color"][s])
     #     stations.plot.bar(ax=ax, yerr=yerr, legend=False, color=cols,rot=30)
     # except TypeError:
-    #     cols.append(c.ix["color"][stations.name])
+    #     cols.append(c.loc["color"][stations.name])
     #     stations.OPi.plot.bar(ax=ax, yerr=stations.covm, legend=False, color=cols)
 
 def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
@@ -345,7 +345,7 @@ def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
         ax = plt.subplot()
 
     c = sourcesColor()
-    cols = c.ix["color",df.columns].values
+    cols = c.loc["color",df.columns].values
     
     df.plot(title=title, color=cols, ax=ax)
     ax.set_ylabel(OPtype)
@@ -373,7 +373,7 @@ def plot_ts_reconstruction_OP(station, OPtype=None, OPobs=None, saveDir=None, ax
         title = station.name
     
     c = sourcesColor()
-    cols = c.ix["color",df.columns].values
+    cols = c.loc["color",df.columns].values
     
     # Date index
     x = df.index
@@ -423,14 +423,13 @@ def plot_seasonal_contribution(station, OPtype=None,
 
     # first, check of station is a string
     # if so, then load the associated Station class (previously saved).
-    if isinstance(station, str):
-        with open(saveDir+"/"+station+"_"+OPtype+".pickle","rb") as f:
-            station = pickle.load(f)
-    
+    # if isinstance(station, str):
+    #     with open(saveDir+"/"+station+"_"+OPtype+".pickle","rb") as f:
+    #         station = pickle.load(f)
     if CHEMorOP=="CHEM":
-        df = station.CHEM.copy()
+        df = station.SRC.copy()
     else:
-        df = station.OPi * station.CHEM
+        df = station.OPi[OPtype] * station.SRC
 
     add_season(df)
 
@@ -440,7 +439,7 @@ def plot_seasonal_contribution(station, OPtype=None,
 
     # selection the colors we have in the sources
     colors  = sourcesColor()
-    c       = colors.ix["color", df_grouped.columns]
+    c       = colors.loc["color", df_grouped.columns]
     # plot the stacked normalized bar plot
     df   = (df_grouped.T / df_grouped.sum(axis=1))
     df.index = [l.replace("_"," ") for l in df.index]
@@ -460,6 +459,29 @@ def plot_seasonal_contribution(station, OPtype=None,
     # plt.title(station.name+" (DTTv)")
     ax.set_title(station.name+" "+OPtype)
     plt.subplots_adjust(top=0.90, bottom=0.10, left=0.15, right=0.85)
+
+def plot_anual_contribution(station, **kwarg):
+    
+    df = pd.DataFrame(columns=["PM mass", "OP DTTv", "OP AAv"])
+    # mass 
+    df["PM mass"] = station.SRC.sum()
+    # OP DTT and OP AAv
+    df["OP DTTv"] = (station.OPi["DTTv"] * station.SRC).sum()
+    df["OP AAv"] = (station.OPi["AAv"] * station.SRC).sum()
+
+    # selection the colors we have in the sources
+    colors  = sourcesColor()
+    c       = colors.loc["color", df.T.columns]
+    # plot the stacked normalized bar plot
+    df   = df / df.sum()
+    df.index = [l.replace("_"," ") for l in df.index]
+    axes = df.T.plot.bar(stacked=True,
+                         rot=0,
+                         color=c,
+                         **kwarg)
+    axes.set_title("Anual")
+
+
 
 def plot_seasonal_contribution_boxplot(station, OPtype=None, saveDir=None,**kwarg):
     """
@@ -481,7 +503,7 @@ def plot_seasonal_contribution_boxplot(station, OPtype=None, saveDir=None,**kwar
     
     # selection the colors we have in the sources
     colors  = sourcesColor()
-    c       = colors.ix["color", df.columns]
+    c       = colors.loc["color", df.columns]
     # plot the boxplot
     df_long = pd.melt(df,"season",var_name="source", value_name="OP")
     ax = sns.boxplot("season", y="OP",hue="source",data=df_long,palette=c)
@@ -646,6 +668,50 @@ def plot_compare_MassOP(stations, list_OPtype, source=None):
                          /((station.CHEM*station.OPi).sum().sum()))[source]     
     return df
 
+def plot_normalized_contribution(station, list_OPtype):
+    f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+2,
+                           figsize=(12,3),
+                           sharey=True)
+    for i, plot in enumerate(["CHEM","DTTv","AAv"]):
+        if i ==0:
+            plot_seasonal_contribution(station, OPtype="Mass",
+                                       CHEMorOP="CHEM",ax=axes[i])    
+            axes[i].set_ylabel("Normalized contribution")
+            axes[i].legend("")
+        else:
+            plot_seasonal_contribution(station, OPtype=plot,
+                                       CHEMorOP="OP",ax=axes[i])    
+        if i==2:
+            axes[i].legend("")
+        axes[i].set_xlabel(" ")
+
+    plot_anual_contribution(station, ax=axes[-1])
+    axes[-1].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    axes[-1].set_xlabel(" ")
+
+def plot_residualvsobs(station, OPtype=None, **kwarg):
+
+    idx = station.OPmodel.index.intersection(station.OP.index)
+    g = sns.JointGrid(x=station.OP.loc[idx, OPtype],
+                      y=station.reg[OPtype].resid.loc[idx])
+    g.plot_joint(plt.errorbar, 
+                 xerr=station.OP.loc[idx, "SD_"+OPtype],
+                 yerr=station.OPmodel_unc.loc[idx, OPtype],
+                 elinewidth=1,
+                 ecolor="k",
+                 linestyle='None',
+                 marker="o",
+                 markersize=6,
+                 markeredgecolor="white",
+                 markeredgewidth=1,
+                 **kwarg)
+    g.plot_marginals(sns.distplot, kde=False, **kwarg)
+    g.ax_marg_x.remove()
+    g.ax_joint.set_ylabel("Obs. - Model [nmol/min/m$^3$]")
+    g.ax_joint.plot([0,g.ax_joint.axis()[1]], [0,0], "--k")
+    g.ax_joint.set_title(OPtype)
+    g.ax_joint.set_xlabel("Obs. [nmol/min/m$^3$]")
+    return g
 
 def print_correlation_obs_predicted(sto, list_station, list_OPtype):
     """

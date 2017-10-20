@@ -15,7 +15,7 @@ from misc_utility.load_data import *
 INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
 # list_station= ["ANDRA","Nice","Frenes","Passy","Chamonix","Marnaz","Marseille","PdB"]
-list_station= ["Chamonix"]
+list_station= ["Nice"]
 
 list_OPtype = ["AAv","DTTv"]
 
@@ -58,8 +58,8 @@ sources = list() # list of all the sources
 OPandStation = product(list_OPtype, list_station)
 # for OPtype, name in OPandStation:
 for name in list_station:
-    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_SRC_Florie.csv",
-                     OPfile="_OP.csv", list_OPtype=list_OPtype)
+    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_ContributionsMass.csv",
+                     OPfile="OP.csv", list_OPtype=list_OPtype)
     station.load_SRC()
     station.load_OP()
     station.setSourcesCategories()
@@ -98,8 +98,8 @@ for name in list_station:
             pred[i] = (params*CHEM).sum(axis=1)
         station.OPmodel_unc[OPtype] = pred.std(axis=1)
         station.OPmodel[OPtype] = (station.SRC * station.OPi[OPtype]).sum(axis=1)
-        station.get_ODR_result(OPtype=OPtype)
-        station.get_pearson_r(OPtype)
+        # station.get_ODR_result(OPtype=OPtype)
+        # station.get_pearson_r(OPtype)
         # ==== Store the result
         # sto[OPtype][name] = Station(name=name,
         #                             CHEM=CHEM, OP=OP, OPunc=OPunc, OPtype=OPtype,
@@ -211,21 +211,24 @@ if plotAll:
 
     # ========== PLOT SEASONAL CONTRIBUTION ============================
     for name in list_station:             
-        f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+1,
+        f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+2,
                                figsize=(12,3),
                                sharey=True)
         for i, plot in enumerate(["CHEM","DTTv","AAv"]):
             if i ==0:
-                plot_seasonal_contribution(sto["DTTv"][name], OPtype="Mass",
+                plot_seasonal_contribution(station, OPtype="Mass",
                                            CHEMorOP="CHEM",ax=axes[i])    
                 axes[i].set_ylabel("Normalized contribution")
                 axes[i].legend("")
             else:
-                plot_seasonal_contribution(sto[plot][name], OPtype=plot,
+                plot_seasonal_contribution(station, OPtype=plot,
                                            CHEMorOP="OP",ax=axes[i])    
             if i==2:
                 axes[i].legend("")
-
             axes[i].set_xlabel(" ")
+
+        plot_anual_contribution(station, ax=axes[-1])
+        axes[i].set_xlabel(" ")
+
         if saveFig:
             plot_save("Normalized_contribution_"+name, OUTPUT_DIR, fmt=["png","pdf"])

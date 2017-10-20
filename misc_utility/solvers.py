@@ -104,6 +104,7 @@ def solve_WLS(X=None, y=None, sigma=None):
             # Some variable are 0, drop them.
             # goForWLS.drop(goForWLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
             # goForWLS.drop(goForWLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
+            print(regr.summary())
             goForWLS.drop(goForWLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
         else:
             # Ok, the run converged
