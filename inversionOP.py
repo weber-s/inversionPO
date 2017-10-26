@@ -15,7 +15,7 @@ from misc_utility.load_data import *
 INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
 # list_station= ["ANDRA","Nice","Frenes","Passy","Chamonix","Marnaz","Marseille","PdB"]
-list_station= ["Nice"]
+list_station= ["Chamonix"]
 
 list_OPtype = ["AAv","DTTv"]
 
@@ -58,7 +58,7 @@ sources = list() # list of all the sources
 OPandStation = product(list_OPtype, list_station)
 # for OPtype, name in OPandStation:
 for name in list_station:
-    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_ContributionsMass.csv",
+    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_SRC_Florie_BCwb.csv",
                      OPfile="OP.csv", list_OPtype=list_OPtype)
     station.load_SRC()
     station.load_OP()

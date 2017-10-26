@@ -146,6 +146,7 @@ class Station:
             "Mineral dust": "Dust",
             "Resuspended dust": "Dust",
             "Dust": "Dust",
+            "Crustal dust": "Dust",
             "Dust (mineral)": "Dust",
             "Dust/biogénique marin": "Dust",
             "AOS/dust": "Dust",

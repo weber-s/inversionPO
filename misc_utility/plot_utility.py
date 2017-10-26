@@ -460,7 +460,7 @@ def plot_seasonal_contribution(station, OPtype=None,
     ax.set_title(station.name+" "+OPtype)
     plt.subplots_adjust(top=0.90, bottom=0.10, left=0.15, right=0.85)
 
-def plot_anual_contribution(station, **kwarg):
+def plot_annual_contribution(station, **kwarg):
     
     df = pd.DataFrame(columns=["PM mass", "OP DTTv", "OP AAv"])
     # mass 
@@ -479,7 +479,7 @@ def plot_anual_contribution(station, **kwarg):
                          rot=0,
                          color=c,
                          **kwarg)
-    axes.set_title("Anual")
+    axes.set_title("Annual")
 
 
 
@@ -672,7 +672,7 @@ def plot_normalized_contribution(station, list_OPtype):
     f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+2,
                            figsize=(12,3),
                            sharey=True)
-    for i, plot in enumerate(["CHEM","DTTv","AAv"]):
+    for i, plot in enumerate(["CHEM"]+list_OPtype):
         if i ==0:
             plot_seasonal_contribution(station, OPtype="Mass",
                                        CHEMorOP="CHEM",ax=axes[i])    
@@ -681,11 +681,11 @@ def plot_normalized_contribution(station, list_OPtype):
         else:
             plot_seasonal_contribution(station, OPtype=plot,
                                        CHEMorOP="OP",ax=axes[i])    
-        if i==2:
-            axes[i].legend("")
+        # if i==2:
+        axes[i].legend("")
         axes[i].set_xlabel(" ")
 
-    plot_anual_contribution(station, ax=axes[-1])
+    plot_annual_contribution(station, ax=axes[-1])
     axes[-1].legend(loc='center left', bbox_to_anchor=(1, 0.5))
     axes[-1].set_xlabel(" ")
 
@@ -782,14 +782,15 @@ def print_coeff(sto, list_station, list_OPtype):
 
     return df
 
-def print_equation(Station):
+def print_equation(station, OPtype):
     """
     Print the equation relathionship between the OP and the sources
     """
     coeff = ""
-    for src in Station.OPi.index:
-        if not np.isnan(Station.OPi[src]):
-            coeff = coeff + " + " + str(round(Station.OPi[src],2)) + "×" + src
-    print("{OPtype} = {const}{coeff}".format(OPtype=Station.OPtype,
-                                                const=round(Station.reg.params[0],2),
+    for src, c in zip(station.reg[OPtype].params[1:].index,
+                      station.reg[OPtype].params[1:]):
+        if not np.isnan(c):
+            coeff = coeff + " + " + str(round(c,2)) + "×" + src
+    print("{OPtype} = {const}{coeff}".format(OPtype=OPtype,
+                                                const=round(station.reg[OPtype].params[0],2),
                                                 coeff=coeff))
