@@ -129,15 +129,28 @@ def plot_corr(df,title=None, alreadyDone=False, ax=None, **kwarg):
         kwarg["ax"] = ax
     if "vmax" not in kwarg:
         kwarg["vmax"]=1
-    if "square" not in kwarg:
-        kwarg["square"]=True
+    if "vmin" not in kwarg:
+        kwarg["vmin"]=-1
+    # if "square" not in kwarg:
+    #     kwarg["square"]=True
+    if "cmap" not in kwarg:
+        kwarg["cmap"]="RdBu_r"
+    if "yticklabels" not in kwarg:
+        kwarg["yticklabels"]=True
+    if "annot" not in kwarg:
+        kwarg["annot"]=True
+        kwarg["fmt"]=".2f"
     
     if alreadyDone:
-        sns.heatmap(df,**kwarg)
+        ax=sns.heatmap(df,**kwarg)
     else:
-        sns.heatmap(df.corr(),**kwarg)
-    ax.set_yticklabels(df.index[::-1],rotation=0)               
-    ax.set_xticklabels(df.columns,rotation=-90)               
+        ax=sns.heatmap(df.corr(),**kwarg)
+    # ax.set_yticklabels(df.index[::-1],rotation=0)               
+    # ax.set_xticklabels(df.columns,rotation=-90)               
+
+    # a = f.axes[0];
+    # a.set_yticks(np.arange(len(df.index))+0.5) 
+    # a.set_yticklabels(df.index, rotation=00)
 
     if title is not None:
         ax.set_title(title)        
@@ -217,13 +230,25 @@ def plot_station_sources(station,**kwarg):
 def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
     """Plot the time series obs/model"""
     if ax == None:
+        plt.figure()
         ax = plt.subplot()
+
+    if "color" in kwarg:
+        color = kwarg["color"]
+    else:
+        color = "#1f77b4"
+
+    if "title" in kwarg:
+        title = kwarg["title"]
+    else:
+        title = "{station} {OPt}".format(station=station.name, OPt=OPtype)
+ 
 
     idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
     ax.errorbar(idx,
                 station.OP.loc[idx, OPtype],
                 yerr=station.OP.loc[idx, "SD_"+OPtype], 
-                color="#1f77b4",
+                color=color,
                 ecolor="black",
                 elinewidth=1,
                 fmt="-o",
@@ -238,14 +263,18 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
                         alpha=0.4, edgecolor='#FF7F0E', facecolor='#FF7F0E',
                         zorder=1)
     ax.plot_date(idx,
-                 station.OPmodel.loc[idx, OPtype], "r-*",
-                 linewidth=2, label="Recons.",zorder=10, color="#FF7F0E")
+                 station.OPmodel.loc[idx, OPtype], "-*",
+                 linewidth=2,
+                 label="Model",
+                 zorder=10,
+                 color="#FF7F0E")
     ax.axis(ymin=max(ax.axis()[2],-1))
     ax.set_ylabel("{OP} loss\n[nmol/min/m³]".format(OP=OPtype[:-1]))
-    plt.title("{station} {OPt}".format(station=station.name, OPt=OPtype))
+    ax.set_title(title)
     handles, labels = ax.get_legend_handles_labels()
-    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0]))
-    l=ax.legend(handles, labels) # in order to have Obs 1st
+    handles.reverse()
+    labels.reverse()
+    l=ax.legend(handles, labels)
     l.draw_frame(False)
 
 
