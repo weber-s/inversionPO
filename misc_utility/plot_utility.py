@@ -169,7 +169,7 @@ def plot_scatterReconsObs(ax, station=None, OPtype=None, obs=None, model=None, p
         obs     = station.OP.loc[idx, OPtype]
         model   = station.OPmodel.loc[idx, OPtype]
         p       = station.get_ODR_result(OPtype)
-        pearsonr= station.pearsonr[OPtype][0]
+        pearsonr= station.get_pearson_r(OPtype)[0]
         xerr    = station.OP.loc[idx, "SD_"+OPtype]
         yerr    = station.OPmodel_unc.loc[idx, OPtype]
     
@@ -186,46 +186,18 @@ def plot_scatterReconsObs(ax, station=None, OPtype=None, obs=None, model=None, p
     ax.set_aspect("equal","box")
     ax.plot([0,obs.max()],[0, obs.max()], '--', label="y=x")
     ax.plot([0,obs.max()],[p[1], p[0]*obs.max()+p[1]], label="linear fit")
-    print(pearsonr)
     ax.text(0.05,0.75,
             "y={:.2f}x{:+.2f}\npearson r={:.2f}".format(p[0],p[1],pearsonr),
             transform=ax.transAxes)
     ax.set_xlabel("Obs.")
-    ax.set_ylabel("Recons.")
-    ax.set_title("obs. vs reconstruction")
+    ax.set_ylabel("Model")
+    ax.set_title("obs. vs model")
     
     ax.axis("square")
     ax.set_aspect(1./ax.get_data_ratio())
     ticks = ax.get_yticks()
     l=ax.legend(loc="lower right")
     l.draw_frame(False)
-
-def plot_station_sources(station,**kwarg):
-    """
-    Plot the mass contrib (piechart), the scatter plot obs/recons, the
-    intrinsic OP and the contribution of the sources/species (TS + piechart).
-    TODO: it's ugly...
-    """
-    plt.figure(figsize=(17,8))
-    # Mass contribution (pie chart)
-    ax=plt.subplot(2,3,1)
-    plot_contribPie(ax, station.CHEM)
-    # Bar plot of coeff for the OP
-    ax=plt.subplot(2,3,2)
-    plot_coeff(station,ax)
-    plt.ylabel("OP [nmol/min/µg]")
-    # Scatter plot obs/recons.
-    ax=plt.subplot(2,3,3)
-    plot_scatterReconsObs(ax, station.OP, station.model, station.p, station.pearson_r)
-    # time serie reconstruction/observation
-    ax=plt.subplot(2,3,(4,5))
-    plot_ts_reconstruction_OP(station,ax=ax)
-    plt.legend(mode="expand", bbox_to_anchor=(0.5,-0.1))
-    # OP contribution (pie chart)
-    ax=plt.subplot(2,3,6)
-    plot_contribPie(ax, (station.CHEM*station.mu).sum())
-
-    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.07, right=0.93)
 
 def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
     """Plot the time series obs/model"""
@@ -348,7 +320,7 @@ def plot_coeff(station, OPtype, yerr=None, ax=None):
     #     cols.append(c.loc["color"][stations.name])
     #     stations.OPi.plot.bar(ax=ax, yerr=stations.covm, legend=False, color=cols)
 
-def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
+def plot_ts_contribution_OP_per_source(station,OPtype=None,saveDir=None, ax=None, **kwarg):
     """
     Plot the time serie contribution of each source to the OP.
     station can be the name of the station or a Station object.
@@ -367,7 +339,7 @@ def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
         fileName = saveDir+station+"_contribution_"+OPtype+".csv"
         df = pd.read_csv(fileName,index_col="date", parse_dates=["date"])
     else:
-        df = station.CHEM * station.OPi
+        df = station.SRC * station.OPi[OPtype]
         title = station.name
 
     if ax == None:
@@ -376,16 +348,17 @@ def plot_ts_contribution_OP(station,OPtype=None,saveDir=None, ax=None):
     c = sourcesColor()
     cols = c.loc["color",df.columns].values
     
-    df.plot(title=title, color=cols, ax=ax)
+    df.plot(title=title, color=cols, ax=ax, **kwarg)
     ax.set_ylabel(OPtype)
     return
 
-def plot_ts_reconstruction_OP(station, OPtype=None, OPobs=None, saveDir=None, ax=None):
+def plot_ts_construction_OP(station, OPtype=None, OPobs=None, saveDir=None,
+                            ax=None):
     """
     Plot a stacked barplot of for the sources contributions to the OP
     """
     if ax == None:
-        f, ax = plt.subplots(1, figsize=(10,5))
+        f, ax = plt.subplots(1, figsize=(12,5))
 
     if isinstance(station, str):
         if saveDir == None or OPobs == None:
@@ -396,9 +369,10 @@ def plot_ts_reconstruction_OP(station, OPtype=None, OPobs=None, saveDir=None, ax
         OP = OPobs
         df = pd.read_csv(fileName,index_col="date", parse_dates=["date"])
     else:
-        df = station.CHEM * station.OPi
-        OP = station.OP.values
-        OPunc = station.OPunc.values
+        df = station.SRC * station.OPi[OPtype]
+        idx = df.index
+        OP = station.OP.loc[idx,OPtype]
+        OPunc = station.OP.loc[idx,"SD_"+OPtype]
         title = station.name
     
     c = sourcesColor()
@@ -429,18 +403,20 @@ def plot_ts_reconstruction_OP(station, OPtype=None, OPobs=None, saveDir=None, ax
                width=width,
                color=c[df.columns[i]])
     # OP observation
-    ax.errorbar(x, OP, OPunc, fmt='ob', ecolor="black", elinewidth=1, markersize=3, label="OP obs.")
+    ax.errorbar(x, OP, OPunc, fmt='ob',
+                ecolor="black", elinewidth=1,
+                markersize=3, label="OP obs.")
 
     # legend stuff
-    ncol = int((len(df.columns)+1)/2)
-    nrow = (len(df.columns)+1)/ncol
-    if nrow > 2:
-        ncol += 1
-    ax.legend(loc="center",ncol=ncol,bbox_to_anchor=(0.5,-0.2))
+    l=ax.legend(loc="center",bbox_to_anchor=(1.15,0.5))
+    l.draw_frame(False)
+
     ax.set_title(title)
     ax.set_ylabel(OPtype)
 
-    plt.subplots_adjust(top=0.90, bottom=0.20, left=0.10, right=0.90)
+    ax.set_ylim(bottom=0)
+
+    plt.subplots_adjust(top=0.90, bottom=0.10, left=0.10, right=0.80)
     return
 
 def plot_seasonal_contribution(station, OPtype=None,
@@ -523,19 +499,20 @@ def plot_seasonal_contribution_boxplot(station, OPtype=None, saveDir=None,**kwar
         with open(saveDir+"/"+station+"_"+OPtype+".pickle","rb") as f:
             station = pickle.load(f)
 
-    df = station.OPi * station.CHEM
+    df = station.OPi[OPtype] * station.SRC
 
     add_season(df)
-    season = np.array(['DJF', 'MAM', 'JJA','SON'])
-    df["ordered"] = season[df["season"]]
-    ordered_season = ["DJF","MAM","JJA","SON"]
+    # season = np.array(['DJF', 'MAM', 'JJA','SON'])
+    # ordered_season = ["DJF","MAM","JJA","SON"]
+    # df["ordered"] = [ordered_season.index(i) for i in df["season"]]
+    #                  
     
     # selection the colors we have in the sources
     colors  = sourcesColor()
-    c       = colors.loc["color", df.columns]
+    c       = colors.loc["color", df.columns[:-1]]
     # plot the boxplot
     df_long = pd.melt(df,"season",var_name="source", value_name="OP")
-    ax = sns.boxplot("season", y="OP",hue="source",data=df_long,palette=c)
+    ax = sns.boxplot("season", y="OP",hue="source",data=df_long,palette=c, **kwarg)
 
     if "title" in kwarg:
         plt.title(kwarg["title"])
@@ -604,28 +581,26 @@ def plot_all_coeff(list_station, OP_type, SAVE_DIR, ax=None):
     ax.set_xlabel("")
     ax.set_ylabel("nmol/min/µg")
 
-def plot_monthly_OP_boxplot(OP):
+def plot_monthly_OP_boxplot(OP, list_OPtype):
     """
     Plot the time series of the OP, one boxplot per month.
-    OP: a DataFrame with "AAv" and "DTTv" column
+    OP: a DataFrame with the list_OPtype columns
+    list_OPtype: the OP to plot
     """
 
     f = plt.figure(figsize=[11.25,2.8])
     
-    df = pd.DataFrame(data={"val":OP["DTTv"].values, "type":"DTTv",
-                            "date":OP.index})    
-    df=df.append(pd.DataFrame(data={"val":OP["AAv"].values,"type":"AAv",
-                                    "date":OP.index}))
-    df["type"]=df["type"].astype("category")  
-    df.index = df["date"]
-    ax=sns.boxplot(x=df.index.month, y=df["val"], hue=df["type"])
+    df = OP[list_OPtype]
+    df["date"] = df.index
+    df = pd.melt(df, id_vars="date")
+    df.set_index("date", inplace=True)
+    ax = sns.boxplot(x=df.index.month, y=df["value"], hue=df["variable"])
 
     
     ax.set_xticklabels(["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"])
     ax.set_ylabel("OP [nmol/min/m³]")
     ax.legend(loc="center", bbox_to_anchor=(1.06,0.5))
 
-    OP.plot(marker="*", figsize=[11.25,2.8], rot=0)
 
 def plot_seasonal_OP_source(list_station, list_OPtype, station_dict=None,
                             saveDir=None):
