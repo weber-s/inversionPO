@@ -62,7 +62,7 @@ class Station:
                                                          file=file)
         df = pd.read_csv(file,
                          index_col=["date"], parse_dates=["date"],
-                         na_values=['#VALUE!', '#DIV/0!'])
+                         na_values=['#VALUE!', '#DIV/0!','#VALEUR !'])
         return df
 
     def load_SRC(self):
