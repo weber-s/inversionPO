@@ -95,9 +95,9 @@ for name in list_station:
         pred = pd.DataFrame(index=CHEM.index)
         for i in list(range(0,NBOOT)):
             params = regr.bse * np.random.randn(len(regr.params))+regr.params
-            pred[i] = (params*CHEM).sum(axis=1)
+            pred[i] = (params*CHEM).sum(axis=1) + params["const"]
         station.OPmodel_unc[OPtype] = pred.std(axis=1)
-        station.OPmodel[OPtype] = (station.SRC * station.OPi[OPtype]).sum(axis=1)
+        station.OPmodel[OPtype] = regr.params["const"]+(station.SRC * station.OPi[OPtype]).sum(axis=1)
         # station.get_ODR_result(OPtype=OPtype)
         # station.get_pearson_r(OPtype)
         # ==== Store the result
