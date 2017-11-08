@@ -91,6 +91,7 @@ def sourcesColor():
         "Biogenique": "#ffc000",
         "Biogenic": "#ffc000",
         "Dust": "#dac6a2",
+        "Crustal_dust": "#dac6a2",
         "Industrial": "#7030a0",
         "Indus/veh": "#7030a0",
         "Arcellor": "#7030a0",
@@ -248,7 +249,6 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
     labels.reverse()
     l=ax.legend(handles, labels)
     l.draw_frame(False)
-
 
 def plot_station(station,OPtype,**kwarg):
     """

@@ -207,6 +207,7 @@ def setSourcesCategories(df):
         "Mineral dust": "Dust",
         "Resuspended dust": "Dust",
         "Dust": "Dust",
+        "Crustal dust": "Crustal_dust",
         "Dust (mineral)": "Dust",
         "Dust/biogénique marin": "Dust",
         "AOS/dust": "Dust",
