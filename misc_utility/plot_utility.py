@@ -59,11 +59,16 @@ def sitesColor():
         "Marnaz": "#1f77b4",
         "Passy": "#ff7f0e",
         "Chamonix": "#2ca02c",
-        "Frenes": "#d62728",
+        "GRE-fr": "#d62728",
         "Nice": "#9467bd",
         "PdB": "#8c564b",
-        "Marseille": "#e377c2",
-        "ANDRA": "#7f7f7f"
+        "MRS-5av": "#e377c2",
+        "STG-cle": "#7f7f7",
+        "Rouen": "#bcbd22",
+        "Talence": "#17becf",
+        "Aix": "#67fecf",
+        "Nogent": "#1g0000",
+        "Roubaix": "#001g00"
     }
     color = pd.DataFrame(index=["color"], data=color)
     return color
@@ -581,6 +586,46 @@ def plot_all_coeff(list_station, OP_type, SAVE_DIR, ax=None):
     ax.set_xlabel("")
     ax.set_ylabel("nmol/min/µg")
 
+def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
+
+    list_station = list(sto.keys())
+    if ax is None:
+        f,axes = plt.subplots(len(list_OPtype),1,sharex=True)
+    
+    sources = []
+    for s in sto.values():                    
+        for OPtype in list_OPtype:
+            sources = sources+[a for a in s.reg[OPtype].params.drop("const").index if a not in sources]
+    
+    coeff = dict()
+    for i, OPtype in enumerate(list_OPtype):
+        coeff[OPtype] = pd.DataFrame(columns=list_station, index=sources)
+        for s in sto.values():
+            coeff[OPtype][s.name] = s.reg[OPtype].params.drop("const")
+
+        df = coeff[OPtype].unstack().reset_index()
+        df.columns=["site","source","OPi"]
+        
+        # get color palette
+        palette = sns.color_palette("Set2", len(list_station))
+
+        # ... then plot it
+        ax = axes[i]
+        sns.boxplot(x="source",y="OPi",data=df, color="white",
+                    ax=ax)
+
+        sns.swarmplot(x="source", y="OPi", hue="site", 
+                      data=df,
+                      palette=palette, 
+                      size=8, edgecolor="black",
+                      ax=ax)
+        ax.legend("")
+
+        ax.set_title(OPtype)
+        ax.set_xlabel("")
+        ax.set_ylabel("nmol/min/µg")
+
+        
 def plot_monthly_OP_boxplot(OP, list_OPtype):
     """
     Plot the time series of the OP, one boxplot per month.
@@ -599,7 +644,7 @@ def plot_monthly_OP_boxplot(OP, list_OPtype):
     
     ax.set_xticklabels(["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"])
     ax.set_ylabel("OP [nmol/min/m³]")
-    ax.legend(loc="center", bbox_to_anchor=(1.06,0.5))
+    ax.legend(loc="center", bbox_to_anchor=(1.06,len(list_OPtype)/2))
 
 
 def plot_seasonal_OP_source(list_station, list_OPtype, station_dict=None,
