@@ -14,8 +14,10 @@ from misc_utility.load_data import *
 
 INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
-# list_station= ["ANDRA","Nice","Frenes","Passy","Chamonix","Marnaz","Marseille","PdB"]
-list_station= ["Chamonix"]
+list_station=["Nice","Aix","GRE-fr",
+              "Chamonix","Roubaix","STG-cle",
+              "MRS-5av","PdB","Nogent","Talence","Lens"]
+# list_station= ["ANDRA"]
 
 list_OPtype = ["AAv","DTTv"]
 
@@ -43,7 +45,7 @@ sum_sources = True
 plotAll     = False
 
 # Number of bootstrap run
-NBOOT = 1000
+NBOOT = 50
 
 # sort list in order to always have the same order
 list_station.sort()
@@ -51,15 +53,15 @@ list_OPtype.sort()
 
 # initialize stuff
 sto = dict()
-for OPtype in list_OPtype:
-    sto[OPtype] = dict()
 sources = list() # list of all the sources
 
 OPandStation = product(list_OPtype, list_station)
 # for OPtype, name in OPandStation:
 for name in list_station:
-    station = Station(name=name, inputDir=INPUT_DIR, SRCfile="_SRC_Florie_BCwb.csv",
-                     OPfile="OP.csv", list_OPtype=list_OPtype)
+    print(name)
+    station = Station(name=name, inputDir=INPUT_DIR,
+                      SRCfile="_SRC_SOURCES.csv",
+                     OPfile="_OP.csv", list_OPtype=list_OPtype)
     station.load_SRC()
     station.load_OP()
     station.setSourcesCategories()
@@ -77,6 +79,9 @@ for name in list_station:
         # ==== Drop days with missing values
         TMP     = station.SRC.merge(station.OP[[OPtype,"SD_"+OPtype]], left_index=True,
                                     right_index=True, how="inner")
+        if len(TMP)==0:
+            print("WARNING: No commun index")
+            continue
         TMP.dropna(inplace=True)
         OP      = TMP[OPtype]
         OPunc   = TMP["SD_"+OPtype]
@@ -101,9 +106,7 @@ for name in list_station:
         # station.get_ODR_result(OPtype=OPtype)
         # station.get_pearson_r(OPtype)
         # ==== Store the result
-        # sto[OPtype][name] = Station(name=name,
-        #                             CHEM=CHEM, OP=OP, OPunc=OPunc, OPtype=OPtype,
-        #                             OPi=OPi, covm=covm, yerr=yerr, reg=regr)
+        sto[name] = station
 
     if saveResult:
         with open(SAVE_DIR+"/"+name+OPtype+".pickle", "wb") as handle:
