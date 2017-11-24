@@ -84,6 +84,26 @@ class Station:
 
     def load_OP(self):
         df = self.load_from_file(self.OPfile)
+        map_columns_name={"date prelevement": "date",
+                          "PO_DTT_µg": "DTTm",
+                          "SD_PO_DTT_µg": "SD_DTTm",
+                          "PO_DTT_m3": "DTTv" ,
+                          "SD_PO_DTT_m3": "SD_DTTv" ,
+                          "PO_AA_µg": "AAm",
+                          "SD_PO_AA_µg": "SD_AAm",
+                          "PO_AA_m3": "AAv",
+                          "SD_PO_AA_m3": "SD_AAv",
+                          "nmol_[H202].µg-1": "DCFHm",
+                          "SD_PO_DCFH_µg": "SD_DCFHm",
+                          "nmol_[H202]equiv.m-3 air": "DCFHv",
+                          "SD_PO_DCFH_m3": "SD_DCFHv"
+                         }
+        df.rename_axis(map_columns_name, axis="columns", inplace=True)
+
+        colOK = [a for a in df.columns if a in
+                 self.list_OPtype+",SD_".join(["nimp"]+self.list_OPtype).split(",")]
+        df = df[colOK]
+        df = df.dropna()
         # warn <0 value
         if (df<0).any().any():
             print("WARNING: concentration negative in OP")
@@ -135,6 +155,7 @@ class Station:
             "Sea/road salt": "Salt",
             "Sea salt": "Salt",
             "Seasalt": "Salt",
+            "Fresh seasalt": "Salt",
             "Sels de mer": "Salt",
             "Aged sea salt": "Aged_salt",
             "Aged seasalt": "Aged_salt",
@@ -152,6 +173,7 @@ class Station:
             "AOS/dust": "Dust",
             "Industrial": "Industrial",
             "Industrie": "Industrial",
+            "Industries": "Industrial",
             "Industry/vehicular": "Indus/veh",
             "Industries/trafic": "Vehicular",
             "Fioul lourd": "Industrial",
