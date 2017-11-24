@@ -100,12 +100,14 @@ def solve_WLS(X=None, y=None, sigma=None):
     while True:
         regr = sm.WLS(y, goForWLS, weights=sigma, cov_type="fixed_scale").fit()
         # if (regr.pvalues > 0.05).any():
-        if (regr.params < 0).any():
+        paramstmp=regr.params.copy()
+        paramstmp["const"]=10
+        if (paramstmp < 0).any():
             # Some variable are 0, drop them.
             # goForWLS.drop(goForWLS.columns[regr.pvalues>0.05],axis=1,inplace=True)
             # goForWLS.drop(goForWLS.columns[regr.pvalues == max(regr.pvalues)],axis=1,inplace=True)
             print(regr.summary())
-            goForWLS.drop(goForWLS.columns[regr.params == min(regr.params)],axis=1,inplace=True)
+            goForWLS.drop(goForWLS.columns[paramstmp == min(paramstmp)],axis=1,inplace=True)
         else:
             # Ok, the run converged
             break
