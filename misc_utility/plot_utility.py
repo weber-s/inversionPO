@@ -5,6 +5,7 @@ import pandas as pd
 import pickle
 from scipy import linalg
 from scipy import polyfit
+import matplotlib.patches as mpatches
 # from statsmodels.sandbox.regression.predstd import wls_prediction_std
 
 sns.set_context("talk")
@@ -109,6 +110,31 @@ def sourcesColor():
     }
     color = pd.DataFrame(index=["color"], data=color)
     return color
+
+def add_legend_from_sources(src, ax=None, marker="rectangle", loc=None):
+    """
+    Add a legend to the figure given a array of sources.
+    """
+    colors = sourcesColor()
+    legend_handles = []
+    legend_labels = src
+    for s in src:
+        c = colors.loc[:,s][0]
+        if marker == "rectangle":
+            extra = mpatches.Rectangle((0, 0), 1, 1, fc=c, fill=True,
+                                       edgecolor='none', linewidth=0)
+        legend_handles.append(extra)
+    
+    if loc != "lower center":
+        ncol =1
+    else:
+        ncol = int(len(src)/2)
+
+    fig = plt.gcf()
+
+    fig.legend(legend_handles, legend_labels, loc=loc,
+               ncol=ncol)
+
 
 def plot_save(name, OUTPUT_DIR, fmt="png"):
     """
@@ -588,6 +614,7 @@ def plot_all_coeff(list_station, OP_type, SAVE_DIR, ax=None):
 
 def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
 
+    ax=None
     list_station = list(sto.keys())
     if ax is None:
         f,axes = plt.subplots(len(list_OPtype),1,sharex=True)
@@ -595,13 +622,17 @@ def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
     sources = []
     for s in sto.values():                    
         for OPtype in list_OPtype:
-            sources = sources+[a for a in s.reg[OPtype].params.drop("const").index if a not in sources]
+            if OPtype in s.reg.keys():
+                sources = sources+[a for a in s.reg[OPtype].params.drop("const").index if a not in sources]
     
     coeff = dict()
     for i, OPtype in enumerate(list_OPtype):
         coeff[OPtype] = pd.DataFrame(columns=list_station, index=sources)
         for s in sto.values():
-            coeff[OPtype][s.name] = s.reg[OPtype].params.drop("const")
+            if OPtype in s.reg.keys():
+                coeff[OPtype][s.name] = s.reg[OPtype].params.drop("const")
+            else:
+                coeff[OPtype][s.name] = np.nan
 
         df = coeff[OPtype].unstack().reset_index()
         df.columns=["site","source","OPi"]
@@ -614,16 +645,17 @@ def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
         sns.boxplot(x="source",y="OPi",data=df, color="white",
                     ax=ax)
 
-        sns.swarmplot(x="source", y="OPi", hue="site", 
+        sns.stripplot(x="source", y="OPi", hue="site", jitter=True,
                       data=df,
                       palette=palette, 
                       size=8, edgecolor="black",
                       ax=ax)
         ax.legend("")
 
-        ax.set_title(OPtype)
+        # ax.set_title(OPtype)
         ax.set_xlabel("")
-        ax.set_ylabel("nmol/min/µg")
+        ax.set_ylabel("Intrinsic {OPtype}\nnmol/min/µg".format(OPtype=OPtype[:-1]))
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
         
 def plot_monthly_OP_boxplot(OP, list_OPtype):
