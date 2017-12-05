@@ -56,23 +56,27 @@ class Station:
         # self.covm.sort_index(inplace=True)
         # self.OPi.sort_index(inplace=True)
         
-    def load_from_file(self, file):
-        file = "{dir}/{station}/{station}{file}".format(dir=self.inputDir,
-                                                         station=self.name,
-                                                         file=file)
+    def load_from_file(self, file, overwriteBDIR=True):
+        if not overwriteBDIR:
+            file = "{dir}/{station}/{station}{file}".format(dir=self.inputDir,
+                                                            station=self.name,
+                                                            file=file)
+        else:
+            file = file
+
         df = pd.read_csv(file,
                          index_col=["date"], parse_dates=["date"],
                          na_values=['#VALUE!', '#DIV/0!','#VALEUR !'])
         return df
 
-    def load_SRC(self):
-        df = self.load_from_file(self.SRCfile)
+    def load_SRC(self, overwriteBDIR=True):
+        df = self.load_from_file(self.SRCfile, overwriteBDIR)
         # remove <0 value
         df[df<0] = 0
         self.SRC = df
 
-    def load_CHEM(self):
-        df = self.load_from_file(self.CHEMfile)
+    def load_CHEM(self, overwriteBDIR=True):
+        df = self.load_from_file(self.CHEMfile, overwriteBDIR)
         # if usecols == None:
         #     df[usecols,
         #TODO
@@ -82,8 +86,8 @@ class Station:
             print("WARNING: concentration negative in CHEM")
         self.CHEM = df
 
-    def load_OP(self):
-        df = self.load_from_file(self.OPfile)
+    def load_OP(self, overwriteBDIR=True):
+        df = self.load_from_file(self.OPfile, overwriteBDIR)
         map_columns_name={"date prelevement": "date",
                           "PO_DTT_µg": "DTTm",
                           "SD_PO_DTT_µg": "SD_DTTm",
@@ -103,7 +107,7 @@ class Station:
         colOK = [a for a in df.columns if a in
                  self.list_OPtype+",SD_".join(["nimp"]+self.list_OPtype).split(",")]
         df = df[colOK]
-        df = df.dropna()
+        df = df.dropna(how='all')
         # warn <0 value
         if (df<0).any().any():
             print("WARNING: concentration negative in OP")
@@ -148,11 +152,13 @@ class Station:
             "Secondary biogenic/HFO": "Marine/HFO",
             "Marine bio/HFO": "Marine/HFO",
             "Marin bio/HFO": "Marine/HFO",
+            "Sulfate rich/HFO": "Marine/HFO",
             "Marine secondary": "Secondary_bio",
             "Marin secondaire": "Secondary_bio",
             "HFO": "HFO",
             "Marin": "Secondary_bio",
             "Sea/road salt": "Salt",
+            "Road salt": "Salt",
             "Sea salt": "Salt",
             "Seasalt": "Salt",
             "Fresh seasalt": "Salt",
@@ -165,6 +171,7 @@ class Station:
             "Biogenique": "Primary_bio",
             "Biogenic": "Primary_bio",
             "Mineral dust": "Dust",
+            "Mineral dust ": "Dust",
             "Resuspended dust": "Dust",
             "Dust": "Dust",
             "Crustal dust": "Dust",
