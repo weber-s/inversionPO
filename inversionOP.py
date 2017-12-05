@@ -16,10 +16,10 @@ INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
 list_station=["Nice","Aix","GRE-fr",
               "Chamonix","Roubaix","STG-cle",
-              "MRS-5av","PdB","Nogent","Talence","Lens"]
+              "MRS-5av","PdB","Nogent","Talence"]
 # list_station= ["ANDRA"]
 
-list_OPtype = ["AAv","DTTv"]
+list_OPtype = ["AAv","DTTv","DCFHv"]
 
 # format to save plot
 fmt_save    =["png","pdf","svg"]
@@ -46,6 +46,8 @@ plotAll     = False
 
 # Number of bootstrap run
 NBOOT = 50
+BDIROP = "~/Documents/BdD/BdD_OP/"
+BDIRSRC= "~/Documents/BdD/BdD_OP/"
 
 # sort list in order to always have the same order
 list_station.sort()
@@ -60,8 +62,10 @@ OPandStation = product(list_OPtype, list_station)
 for name in list_station:
     print(name)
     station = Station(name=name, inputDir=INPUT_DIR,
-                      SRCfile="_SRC_SOURCES.csv",
-                     OPfile="_OP.csv", list_OPtype=list_OPtype)
+                      SRCfile="{BDIRSRC}/{site}/{site}_SRC_SOURCES.csv".format(BDIRSRC=BDIRSRC,site=name),
+                      OPfile="{BDIROP}/{site}/{site}_OP.csv".format(BDIROP=BDIROP,
+                                                                    site=name)
+                      ,list_OPtype=list_OPtype)
     station.load_SRC()
     station.load_OP()
     station.setSourcesCategories()
@@ -70,10 +74,12 @@ for name in list_station:
     if sum_sources:
         station.mergeSources(inplace=True)
     for OPtype in list_OPtype:
+        print(name,OPtype)
         if not(OPtype in station.OP.columns) or station.OP[OPtype].isnull().all():
             # we didn't measure this OP
             # so save it and continue
-            sto[OPtype][name] = station
+            print(name)
+            print(OPtype)            
             continue
 
         # ==== Drop days with missing values
@@ -106,7 +112,7 @@ for name in list_station:
         # station.get_ODR_result(OPtype=OPtype)
         # station.get_pearson_r(OPtype)
         # ==== Store the result
-        sto[name] = station
+    sto[name] = station
 
     if saveResult:
         with open(SAVE_DIR+"/"+name+OPtype+".pickle", "wb") as handle:
@@ -161,7 +167,7 @@ if plotAll:
             station=sto[list_OPtype[j]][list_station[i]]
             if j == 0:
                 ax.set_title(list_station[i])
-            plot_contribPie(ax, station)
+            plot_contribPie(ax, station, labels=None)
             if i == 0:
                 ax.set_ylabel(list_OPtype[j], {'size': '16'} )
                 ax.yaxis.labelpad = 60
@@ -190,15 +196,18 @@ if plotAll:
 
     # ========== COMPARE CHEM - OP PIE CHART ========================================
     f,axes = plt.subplots(nrows=len(list_OPtype)+1,ncols=len(list_station),figsize=(17,8))
+    src=[]
+    h=[]
     for j, row in enumerate(axes):
         for i, ax in enumerate(row):
             if j==0:
                 ax.set_title(list_station[i])
-                df = sto[list_OPtype[j]][list_station[i]].CHEM
+                df = sto[list_station[i%len(list_station)]].SRC
             else:
-                df = sto[list_OPtype[j-1]][list_station[i]].CHEM\
-                        * sto[list_OPtype[j-1]][list_station[i]].OPi
-            plot_contribPie(ax, df)
+                df = sto[list_station[i%len(list_station)]].SRC \
+                    * sto[list_station[i%len(list_station)]].OPi[list_OPtype[j-1]]
+            src = src + [a for a in df.columns if a not in src]
+            plot_contribPie(ax, df, labels=None)
             if i == 0:
                 if j == 0:
                     ax.set_ylabel("Mass", {'size': '16'} )
