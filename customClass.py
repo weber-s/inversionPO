@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy import odr
 import scipy.stats as stats
+import statsmodels.api as sm
 
 class Station:
     """
@@ -223,6 +224,20 @@ class Station:
             self.SRC = df_merged
         else:
             return df_merged
+
+    def get_WLS_result(self, OPtype, x=None, y=None, sy=None):
+        if x == None:
+            idx = self.OP[OPtype].index.intersection(self.OPmodel[OPtype].index)
+                          
+            mywls = sm.WLS(self.OPmodel.loc[idx, OPtype],
+                          sm.add_constant(self.OP.loc[idx,OPtype]),
+                          weights=1/self.OPmodel_unc.loc[idx, OPtype])
+        else:
+            mywls = sm.WLS(y, x, sy)
+        output = mywls.fit()
+        self.wls = mywls
+        self.wls_coeff = output.params
+        return output
 
     def get_ODR_result(self, OPtype, x=None, y=None, sx=None, sy=None):
         if x == None:

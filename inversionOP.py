@@ -14,12 +14,12 @@ from misc_utility.load_data import *
 
 INPUT_DIR = "/home/webersa/Documents/BdD/BdD_OP/"
 
-list_station=["Nice","Aix","GRE-fr",
-              "Chamonix","Roubaix","STG-cle",
-              "MRS-5av","PdB","Nogent","Talence"]
-# list_station= ["ANDRA"]
+# list_station=["Nice","Aix","GRE-fr", "Chamonix","Roubaix","STG-cle",
+#               "MRS-5av","PdB","Nogent","Talence"]
+list_station= ["Chamonix"]
 
-list_OPtype = ["AAv","DTTv","DCFHv"]
+# list_OPtype = ["AAv","DTTv","DCFHv"]
+list_OPtype = ["AAv","DTTv"]
 
 # format to save plot
 fmt_save    =["png","pdf","svg"]
@@ -62,7 +62,7 @@ OPandStation = product(list_OPtype, list_station)
 for name in list_station:
     print(name)
     station = Station(name=name, inputDir=INPUT_DIR,
-                      SRCfile="{BDIRSRC}/{site}/{site}_SRC_SOURCES.csv".format(BDIRSRC=BDIRSRC,site=name),
+                      SRCfile="{BDIRSRC}/{site}/{site}_SRC_Florie_BCwb.csv".format(BDIRSRC=BDIRSRC,site=name),
                       OPfile="{BDIROP}/{site}/{site}_OP.csv".format(BDIROP=BDIROP,
                                                                     site=name)
                       ,list_OPtype=list_OPtype)

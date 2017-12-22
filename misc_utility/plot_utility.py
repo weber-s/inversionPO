@@ -191,35 +191,52 @@ def plot_corr(df,title=None, alreadyDone=False, ax=None, **kwarg):
 
     return ax
 
-def plot_scatterReconsObs(ax, station=None, OPtype=None, obs=None, model=None, p=None,
-                          pearsonr=None, xerr=None, yerr=None):
+def plot_scatterReconsObs(station=None, OPtype=None, obs=None, model=None, p=None,
+                          pearsonr=None, xerr=None, yerr=None, **kwarg):
     """
     Scatter plot between the observation and the model.
     """
+    if "ax" not in kwarg:
+        ax = plt.subplot()
+    else:
+        ax = kwarg["ax"]
+
+    if "color" not in kwarg:
+        color = "#1f77b4"
+    else:
+        color = "black"
+
+
     if station is not None:
         idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
         obs     = station.OP.loc[idx, OPtype]
         model   = station.OPmodel.loc[idx, OPtype]
-        p       = station.get_ODR_result(OPtype)
+        reg     = station.get_WLS_result(OPtype)
         pearsonr= station.get_pearson_r(OPtype)[0]
         xerr    = station.OP.loc[idx, "SD_"+OPtype]
         yerr    = station.OPmodel_unc.loc[idx, OPtype]
     
+    beta = reg.params.values
+    reg.summary()
     # pd.concat((obs,model), axis=1).plot(ax=ax,x=[0], y=[1], kind="scatter")
-    ax.errorbar(x=obs, y=model, xerr=xerr, yerr=yerr, label="", 
+    ax.errorbar(x=obs, y=model, xerr=None, yerr=yerr, label="", 
                 elinewidth=1,
                 ecolor="k",
                 linestyle='None',
                 marker="o",
                 markersize=6,
+                markerfacecolor=color,
                 markeredgecolor="white",
                 markeredgewidth=1)
 
     ax.set_aspect("equal","box")
-    ax.plot([0,obs.max()],[0, obs.max()], '--', label="y=x")
-    ax.plot([0,obs.max()],[p[1], p[0]*obs.max()+p[1]], label="linear fit")
-    ax.text(0.05,0.75,
-            "y={:.2f}x{:+.2f}\npearson r={:.2f}".format(p[0],p[1],pearsonr),
+    ax.plot([0,obs.max()],[0, obs.max()], '--', color=color, label="y=x")
+    ax.plot([0,obs.max()],[beta[0], beta[1]*obs.max()+beta[0]],
+            color=color, label="linear fit")
+    ax.text(0.05,0.78,
+            "y={:.2f}x{:+.2f}\npearson r$^2$={:.2f}".format(beta[1],
+                                                            beta[0],
+                                                            pearsonr**2),
             transform=ax.transAxes)
     ax.set_xlabel("Obs.")
     ax.set_ylabel("Model")
@@ -656,6 +673,7 @@ def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
         ax.set_xlabel("")
         ax.set_ylabel("Intrinsic {OPtype}\nnmol/min/µg".format(OPtype=OPtype[:-1]))
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    plt.legend()
 
         
 def plot_monthly_OP_boxplot(OP, list_OPtype):
@@ -709,17 +727,22 @@ def plot_seasonal_OP_source(list_station, list_OPtype, station_dict=None,
         coeff = coeff.join([stations_dict[name].OPi for name in list_station], how="outer")
         source = list(coeff.index)
 
-def plot_scatterReconsObs_all(sto,list_OPtype,list_station):
+def plot_scatterReconsObs_all(stations, list_OPtype, list_station, **kwarg):
     """
-    Plot the scatter plot obs/reconstructed for all the stations.
+    Plot the scatter plot obs/reconstructed for all the stations
+    and the list_OPtype
     """
     f, axes = plt.subplots(nrows=len(list_OPtype), ncols=len(list_station),
                            figsize=(14,4))
+    if len(list_station)==1:
+        axes.shape=(2,1)
     for i, OPtype in enumerate(list_OPtype):
         for j, name in enumerate(list_station):
-            plot_scatterReconsObs(axes[i][j], sto[OPtype][name].OP,
-                                  sto[OPtype][name].model, sto[OPtype][name].p,
-                                  sto[OPtype][name].pearson_r)
+            plot_scatterReconsObs(ax=axes[i][j],
+                                  station=stations[name],
+                                  OPtype=OPtype,
+                                  **kwarg
+                                 )
 
             if i==0:
                 axes[i][j].set_title(name)
