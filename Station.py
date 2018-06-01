@@ -8,23 +8,16 @@ class Station:
     """
     This class is more a storage class for each station than a proper class...
     """
-    def __init__(self, inputDir=None, name=None, SRCfile=None, OPfile=None,
-                 CHEMfile=None,
-                 SRC=None, CHEM=None, OP=None, OPunc=None, list_OPtype=None, OPi=None, OPiunc=None,
+    def __init__(self, name=None, SRC=None, OP=None, OPunc=None, 
+                 list_OPtype=None, OPi=None, OPiunc=None, 
                  reg=None, modelunc=None,
                  ):
 
-        self.inputDir = inputDir
         self.name   = name
-
-        self.SRCfile = SRCfile
-        self.OPfile = OPfile
-        self.CHEMfile = CHEMfile
 
         self.list_OPtype = list_OPtype
 
         self.SRC    = SRC
-        self.CHEM   = CHEM
         self.OP     = OP
 
         self.OPi    = pd.DataFrame(columns=list_OPtype)
@@ -37,26 +30,6 @@ class Station:
         self.odr = None
         self.odr_coeff = None
 
-        #if OP is not None:
-        #    self.model  = pd.Series((PM*OPi).sum(axis=1), name=name)
-        #    self.odr    = self.get_ODR_result()
-        #    self.p      = self.odr.beta
-        #    self.p.shape= (2,)
-        #    self.pearson_r = pd.concat([OP,self.model],axis=1).corr().as_matrix()
-        #    self.covm   = covm
-        #else:
-        #    self.OPi    = pd.Series(index=PM.columns)
-        #    self.model  = pd.Series(index=PM.index)
-        #    self.pie    = pd.Series(index=PM.columns)
-        #    self.p      = None
-        #    self.pearson_r  = None
-        #    self.covm   = pd.Series(index=PM.columns)
-        #    self.yerr   = None
-        #    self.reg    = None
-
-        # self.covm.sort_index(inplace=True)
-        # self.OPi.sort_index(inplace=True)
-        
     def load_from_file(self, file, overwriteBDIR=True):
         if not overwriteBDIR:
             file = "{dir}/{station}/{station}{file}".format(dir=self.inputDir,
@@ -70,11 +43,15 @@ class Station:
                          na_values=['#VALUE!', '#DIV/0!','#VALEUR !'])
         return df
 
-    def load_SRC(self, overwriteBDIR=True):
-        df = self.load_from_file(self.SRCfile, overwriteBDIR)
+    def load_SRC(self, df=None):
+        to_exclude = ["index", "station", "programme"]
+        df.dropna(axis=1, how="all", inplace=True)
+        df.drop(to_exclude, axis=1, inplace=True)
+        df.date = pd.to_datetime(df.date)
+        df.set_index(["date"], drop=True, inplace=True)
         # remove <0 value
-        df[df<0] = 0
-        self.SRC = df
+        # df[df<0] = 0
+        self.SRC = df.sort_index(axis=1)
 
     def load_CHEM(self, overwriteBDIR=True):
         df = self.load_from_file(self.CHEMfile, overwriteBDIR)
@@ -87,8 +64,7 @@ class Station:
             print("WARNING: concentration negative in CHEM")
         self.CHEM = df
 
-    def load_OP(self, overwriteBDIR=True):
-        df = self.load_from_file(self.OPfile, overwriteBDIR)
+    def load_OP(self, df=None):
         map_columns_name={"date prelevement": "date",
                           "PO_DTT_µg": "DTTm",
                           "SD_PO_DTT_µg": "SD_DTTm",
@@ -98,20 +74,26 @@ class Station:
                           "SD_PO_AA_µg": "SD_AAm",
                           "PO_AA_m3": "AAv",
                           "SD_PO_AA_m3": "SD_AAv",
-                          "nmol_[H202].µg-1": "DCFHm",
+                          "nmol_H2O2.µg-1": "DCFHm",
                           "SD_PO_DCFH_µg": "SD_DCFHm",
-                          "nmol_[H202]equiv.m-3 air": "DCFHv",
+                          "nmol_H2O2equiv.m-3 air": "DCFHv",
                           "SD_PO_DCFH_m3": "SD_DCFHv"
                          }
-        df.rename_axis(map_columns_name, axis="columns", inplace=True)
+        df.rename(map_columns_name, axis="columns", inplace=True)
+        df.date = pd.to_datetime(df.date)
+        df.set_index("date", drop=True, inplace=True)
 
-        colOK = [a for a in df.columns if a in
-                 self.list_OPtype+",SD_".join(["nimp"]+self.list_OPtype).split(",")]
+        colOK = []
+        for OPtype in self.list_OPtype:
+            colOK += [var for var in df.columns if OPtype in var]
         df = df[colOK]
         df = df.dropna(how='all')
         # warn <0 value
         if (df<0).any().any():
             print("WARNING: concentration negative in OP")
+        if any(df==0):
+            print("WARNING: some value are 0 in OP or SD OP, set it to 1e-5")
+            df[df==0] = 1e-5
         self.OP = df
 
     def setSourcesCategories(self):
@@ -129,9 +111,11 @@ class Station:
             "Vehicular": "Vehicular",
             "VEH": "Vehicular",
             "VEH ind": "Vehicular_ind",
+            "Traffic_exhaust": "Traffic_exhaust",
+            "Traffic_non-exhaust": "Traffic_non-exhaust",
             "VEH dir": "Vehicular_dir",
             "Oil/Vehicular": "Vehicular",
-            "Road traffic": "Vehicular",
+            "Road traffic": "Road dust",
             "Road trafic": "Vehicular",
             "Bio. burning": "Bio_burning",
             "Bio burning": "Bio_burning",
@@ -166,6 +150,7 @@ class Station:
             "Sels de mer": "Salt",
             "Aged sea salt": "Aged_salt",
             "Aged seasalt": "Aged_salt",
+            "Aged seasalt": "Aged_salt",
             "Primary bio": "Primary_bio",
             "Primary biogenic": "Primary_bio",
             "Biogénique primaire": "Primary_bio",
@@ -192,6 +177,7 @@ class Station:
             "PM other": "Other"
             }
         self.SRC.rename(columns=possible_sources, inplace=True)
+        self.SRC.sort_index(axis=1, inplace=True)
     
     def mergeSources(self, inplace=True):
         """
@@ -227,10 +213,12 @@ class Station:
 
     def get_WLS_result(self, OPtype, x=None, y=None, sy=None):
         if x == None:
-            idx = self.OP[OPtype].index.intersection(self.OPmodel[OPtype].index)
+            x = self.OP[OPtype]
+            y = self.reg[OPtype].fittedvalues
+            idx = x.index.intersection(y.index)
                           
-            mywls = sm.WLS(self.OPmodel.loc[idx, OPtype],
-                          sm.add_constant(self.OP.loc[idx,OPtype]),
+            mywls = sm.WLS(y[idx],
+                          sm.add_constant(x[idx]),
                           weights=1/self.OPmodel_unc.loc[idx, OPtype])
         else:
             mywls = sm.WLS(y, x, sy)
