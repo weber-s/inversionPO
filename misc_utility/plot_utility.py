@@ -52,33 +52,37 @@ def renameIndex():
         }
     return rename
 
-def sitesColor():
+def sitesMarker():
     """
-    Colors for the sites. Follows mpl.colors.TABLEAU_COLORS
+    Marker for the sites.
     """
-    color ={
-        "Marnaz": "#1f77b4",
-        "Passy": "#ff7f0e",
-        "Chamonix": "#2ca02c",
-        "GRE-fr": "#d62728",
-        "Nice": "#9467bd",
-        "PdB": "#8c564b",
-        "MRS-5av": "#e377c2",
-        "STG-cle": "#7f7f7",
-        "Rouen": "#bcbd22",
-        "Talence": "#17becf",
-        "Aix": "#67fecf",
-        "Nogent": "#1g0000",
-        "Roubaix": "#001g00"
+    marker ={
+        "Marnaz": "o",
+        "Passy": "v",
+        "Chamonix": "^",
+        "GRE-fr": "<",
+        "Nice": ">",
+        "PdB": "8",
+        "MRS-5av": "s",
+        "STG-cle": "p",
+        "Rouen": "*",
+        "Talence": "h",
+        "Aix-en-provence": "H",
+        "Nogent": "D",
+        "Roubaix": "d",
+        "Talence": "P"
     }
-    color = pd.DataFrame(index=["color"], data=color)
-    return color
+    marker = pd.DataFrame(index=["marker"], data=marker)
+    return marker
 
 def sourcesColor():
     color ={
         "Vehicular": "#000000",
-        "Vehicular_ind": "#111111",
-        "Vehicular_dir": "#333333",
+        "Vehicular_ind": "#000000",
+        "Traffic_exhaust": "#000000",
+        "Road dust": "#000000",
+        "Vehicular_dir": "#444444",
+        "Traffic_non-exhaust": "#444444",
         "Oil/Vehicular": "#000000",
         "Bio_burning": "#92d050",
         "Bio_burning1": "#92d050",
@@ -87,8 +91,10 @@ def sourcesColor():
         "Nitrate_rich": "#ff7f2a",
         "Secondary_bio": "#8c564b",
         "Marine/HFO": "#8c564b",
+        "Aged seasalt/HFO": "#8c564b",
         "Marine_bio": "#fc564b",
         "HFO": "#70564b",
+        "HFO (stainless)": "#70564b",
         "Marine": "#33b0f6",
         "Marin": "#33b0f6",
         "Salt": "#00b0f0",
@@ -136,7 +142,7 @@ def add_legend_from_sources(src, ax=None, marker="rectangle", loc=None):
                ncol=ncol)
 
 
-def plot_save(name, OUTPUT_DIR, fmt="png"):
+def plot_save(name, OUTPUT_DIR, fmt=["png"]):
     """
     Save the current figure to OUPUT_DIR with the name 'name'
     Formats are passed in the fmt array. Default is png.
@@ -208,11 +214,11 @@ def plot_scatterReconsObs(station=None, OPtype=None, obs=None, model=None, p=Non
 
 
     if station is not None:
-        idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
+        idx = station.OP[OPtype].index.intersection(station.reg[OPtype].fittedvalues.index)
         obs     = station.OP.loc[idx, OPtype]
         model   = station.OPmodel.loc[idx, OPtype]
         reg     = station.get_WLS_result(OPtype)
-        pearsonr= station.get_pearson_r(OPtype)[0]
+        pearsonr= pd.concat([obs, model], axis=1).corr().iloc[1,0]
         xerr    = station.OP.loc[idx, "SD_"+OPtype]
         yerr    = station.OPmodel_unc.loc[idx, OPtype]
     
@@ -265,7 +271,7 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
         title = "{station} {OPt}".format(station=station.name, OPt=OPtype)
  
 
-    idx = station.OP[OPtype].index.intersection(station.OPmodel[OPtype].index)
+    idx = station.OP[OPtype].index.intersection(station.reg[OPtype].fittedvalues.index)
     ax.errorbar(idx,
                 station.OP.loc[idx, OPtype],
                 yerr=station.OP.loc[idx, "SD_"+OPtype], 
@@ -290,7 +296,7 @@ def plot_timeserie_obsvsmodel(station, OPtype, ax=None, **kwarg):
                  zorder=10,
                  color="#FF7F0E")
     ax.axis(ymin=max(ax.axis()[2],-1))
-    ax.set_ylabel("{OP} loss\n[nmol/min/m³]".format(OP=OPtype[:-1]))
+    ax.set_ylabel("{OP} loss\n(nmol/min/m³)".format(OP=OPtype[:-1]))
     ax.set_title(title)
     handles, labels = ax.get_legend_handles_labels()
     handles.reverse()
@@ -309,11 +315,11 @@ def plot_station(station,OPtype,**kwarg):
     plot_timeserie_obsvsmodel(station, OPtype, ax=ax)
     # scatter plot reconstruction/observation
     ax=plt.subplot(2,3,4)
-    plot_scatterReconsObs(ax, station, OPtype=OPtype)
+    plot_scatterReconsObs(station, OPtype=OPtype, ax=ax)
     # factors contribution
     ax=plt.subplot(2,3,5)
     plot_coeff(station, OPtype=OPtype, ax=ax)
-    plt.ylabel("OP [nmol/min/µg]")
+    plt.ylabel("OP (nmol/min/µg)")
     # Pie chart
     ax=plt.subplot(2,3,6)
     plot_contribPie(ax, station, OPtype=OPtype, **kwarg)
@@ -354,12 +360,9 @@ def plot_coeff(station, OPtype, yerr=None, ax=None):
     if ax==None:
         ax = plt.subplots(row=len(OPtype_list), columns=len(station.keys()))
 
-    c = sitesColor()
-    cols = list()
-    if hasattr(station, "name"):
-        cols.append(c.loc["color"][station.name])
-        station.OPi[OPtype].plot.bar(ax=ax, yerr=station.OPi["SD_"+OPtype],
-                                     legend=False, color=cols)
+    c = "#999999"
+    station.OPi[OPtype].plot.bar(ax=ax, yerr=station.OPi["SD_"+OPtype],
+                                 legend=False, color=c)
     # try:
     #     for s in stations:
     #         cols.append(c.loc["color"][s])
@@ -467,8 +470,8 @@ def plot_ts_construction_OP(station, OPtype=None, OPobs=None, saveDir=None,
     plt.subplots_adjust(top=0.90, bottom=0.10, left=0.10, right=0.80)
     return
 
-def plot_seasonal_contribution(station, OPtype=None,
-                               saveDir=None,CHEMorOP="OP",**kwarg):
+def plot_seasonal_contribution(station, OPtype=None, saveDir=None,
+                               CHEMorOP="OP", normalize=True, **kwarg):
     """
     Plot a stacked bar plot of the normalized contribution of the source to the
     OP.
@@ -494,7 +497,12 @@ def plot_seasonal_contribution(station, OPtype=None,
     colors  = sourcesColor()
     c       = colors.loc["color", df_grouped.columns]
     # plot the stacked normalized bar plot
-    df   = (df_grouped.T / df_grouped.sum(axis=1))
+    if normalize:
+        df = (df_grouped.T / df_grouped.sum(axis=1))
+    else:
+        df_grouped = df.groupby("season").mean().reindex(ordered_season)
+        df = df_grouped.T
+        
     df.index = [l.replace("_"," ") for l in df.index]
     axes = df.T.plot.bar(stacked=True,
                          rot=0,
@@ -513,25 +521,35 @@ def plot_seasonal_contribution(station, OPtype=None,
     ax.set_title(station.name+" "+OPtype)
     plt.subplots_adjust(top=0.90, bottom=0.10, left=0.15, right=0.85)
 
-def plot_annual_contribution(station, **kwarg):
+def plot_annual_contribution(station, list_OPtype, normalize=False, **kwarg):
+    """
+    Bar plot of the annual contribution.
+    normalize = True does not not make sens... 
+    """
     
-    df = pd.DataFrame(columns=["PM mass", "OP DTTv", "OP AAv"])
+    OPtypes = ["OP "+OP for OP in list_OPtype]
+    df = pd.DataFrame(columns=["PM mass"]+OPtypes)
     # mass 
     df["PM mass"] = station.SRC.sum()
     # OP DTT and OP AAv
-    df["OP DTTv"] = (station.OPi["DTTv"] * station.SRC).sum()
-    df["OP AAv"] = (station.OPi["AAv"] * station.SRC).sum()
+    for OPtype in list_OPtype:
+        df["OP "+OPtype] = (station.OPi[OPtype] * station.SRC).sum()
+    # df["OP AAv"] = (station.OPi["AAv"] * station.SRC).sum()
 
     # selection the colors we have in the sources
     colors  = sourcesColor()
     c       = colors.loc["color", df.T.columns]
     # plot the stacked normalized bar plot
-    df   = df / df.sum()
+    if normalize:
+        df   = df / df.sum()
     df.index = [l.replace("_"," ") for l in df.index]
+    df.columns = [l.replace(" ","\n") for l in df.columns]
     axes = df.T.plot.bar(stacked=True,
-                         rot=0,
+                         rot=00,
                          color=c,
                          **kwarg)
+    # print(axes.get_xticklabels())
+    # axes.set_xticklabels(axes.get_xticklabels().replace(' ', '\n'))
     axes.set_title("Annual")
 
 
@@ -585,84 +603,48 @@ def plot_regplot(X, Y, title=None):
     if title is not None:
         plt.suptitle(title)
 
-def plot_all_coeff(list_station, OP_type, SAVE_DIR, ax=None):
+def plot_coeff_all_boxplot(sto, list_OPtype):
     """
     plot a boxplot + a swarmplot plot of the coefficients
-    stations: list name of the station to plot.
+
+    sto: dict of Station object.
+    list_OPtype: list of OP to plot
+
     """
-    if ax is None:
-        ax = plt.gca()
-    
-    # get all the station and sources
-    stations_dict = dict()
-    coeff = pd.DataFrame()
-    for name in list_station:
-        with open(SAVE_DIR+"/"+name+OP_type+".pickle", "rb") as h:
-            stations_dict[name] = pickle.load(h)
-    coeff = coeff.join([stations_dict[name].OPi for name in list_station], how="outer")
-    source = list(coeff.index)
-
-    # coeff.drop(["Marine/HFO"], inplace=True)
-    # make it in a categorical dataframe
-    multiIndex = pd.MultiIndex.from_product([source,list_station],names=["source","site"])
-    df = pd.DataFrame(data=coeff.values.reshape(coeff.values.size,),
-                      index=multiIndex,
-                      columns=["val",])
-
-    # get color palette
-    colors = sitesColor()
-    colors = colors[list_station]
-    palette = colors.values.reshape(len(list_station),)
-
-    # ... then plot it
-    sns.boxplot(data=coeff.T, color="white",
-                ax=ax)
-
-    sns.swarmplot(x="source", y="val", hue="site", 
-                  data=df.reset_index(),
-                  palette=palette, 
-                  size=8, edgecolor="black",
-                  ax=ax)
-    ax.legend("")
-
-    ax.set_title(OP_type)
-    ax.set_xlabel("")
-    ax.set_ylabel("nmol/min/µg")
-
-def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
-
-    ax=None
     list_station = list(sto.keys())
-    if ax is None:
-        f,axes = plt.subplots(len(list_OPtype),1,sharex=True)
+    f, axes = plt.subplots(nrows=len(list_OPtype), ncols=1, sharex=True,
+                           figsize=(17,len(list_OPtype)*5))
     
     sources = []
     for s in sto.values():                    
-        for OPtype in list_OPtype:
-            if OPtype in s.reg.keys():
-                sources = sources+[a for a in s.reg[OPtype].params.drop("const").index if a not in sources]
+        sources = sources+[a for a in s.OPi.index if a not in sources]
+    sources.sort()
     
     coeff = dict()
     for i, OPtype in enumerate(list_OPtype):
         coeff[OPtype] = pd.DataFrame(columns=list_station, index=sources)
         for s in sto.values():
-            if OPtype in s.reg.keys():
-                coeff[OPtype][s.name] = s.reg[OPtype].params.drop("const")
+            if OPtype in s.OPi.columns:
+                coeff[OPtype][s.name] = s.OPi[OPtype]
             else:
                 coeff[OPtype][s.name] = np.nan
 
+        coeff[OPtype] = coeff[OPtype].dropna(axis=1, how="all")
         df = coeff[OPtype].unstack().reset_index()
-        df.columns=["site","source","OPi"]
+        df.columns=["site", "source", "OPi"]
         
         # get color palette
-        palette = sns.color_palette("Set2", len(list_station))
+        palette = sns.color_palette("Paired", len(list_station))
 
         # ... then plot it
-        ax = axes[i]
-        sns.boxplot(x="source",y="OPi",data=df, color="white",
-                    ax=ax)
+        if isinstance(axes, np.ndarray):
+            ax = axes[i]
+        else:
+            ax = axes
+        # sns.boxplot(x="source", y="OPi", data=df, color="white", ax=ax)
+        sns.boxplot(data=coeff[OPtype].T, color="white", ax=ax)
 
-        sns.stripplot(x="source", y="OPi", hue="site", jitter=True,
+        sns.swarmplot(x="source", y="OPi", hue="site",
                       data=df,
                       palette=palette, 
                       size=8, edgecolor="black",
@@ -672,8 +654,19 @@ def plot_coeff_all_boxplot(sto, list_OPtype, ax=None):
         # ax.set_title(OPtype)
         ax.set_xlabel("")
         ax.set_ylabel("Intrinsic {OPtype}\nnmol/min/µg".format(OPtype=OPtype[:-1]))
+    # remove "_"
+    xl = ax.get_xticklabels()
+    l = list()
+    for xli in xl:
+        l.append(xli.get_text())
+        l = [l.replace("_"," ") for l in l]
+    ax.set_xticklabels(l, rotation=0)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-    plt.legend()
+    if isinstance(axes, np.ndarray):
+        f.legend(*ax.get_legend_handles_labels(), "center right")
+    else:
+        ax.legend(loc="center right", bbox_to_anchor=(1.20,0.5))
+    plt.subplots_adjust(top=0.95, bottom=0.16, left=0.12, right=0.88)
 
         
 def plot_monthly_OP_boxplot(OP, list_OPtype):
@@ -684,7 +677,7 @@ def plot_monthly_OP_boxplot(OP, list_OPtype):
     """
 
     f = plt.figure(figsize=[11.25,2.8])
-    
+   
     df = OP[list_OPtype]
     df["date"] = df.index
     df = pd.melt(df, id_vars="date")
@@ -693,7 +686,7 @@ def plot_monthly_OP_boxplot(OP, list_OPtype):
 
     
     ax.set_xticklabels(["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"])
-    ax.set_ylabel("OP [nmol/min/m³]")
+    ax.set_ylabel("OP (nmol/min/m³)")
     ax.legend(loc="center", bbox_to_anchor=(1.06,len(list_OPtype)/2))
 
 
@@ -772,26 +765,48 @@ def plot_compare_MassOP(stations, list_OPtype, source=None):
                          /((station.CHEM*station.OPi).sum().sum()))[source]     
     return df
 
-def plot_normalized_contribution(station, list_OPtype):
-    f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+2,
+def plot_barplot_contribution(station, list_OPtype, normalize=True):
+    """
+    Plot a stacked bar plot of the normalized contribution of the differente
+    sources to the PM mass and OP.
+
+    station: a Station object
+    list_OPtype: list of OP type to plot
+
+    """
+    bonus = 2 if normalize else 1
+    f, axes = plt.subplots(nrows=1, ncols=len(list_OPtype)+bonus,
                            figsize=(12,3),
-                           sharey=True)
+                           sharey=True if normalize else False)
     for i, plot in enumerate(["CHEM"]+list_OPtype):
         if i ==0:
-            plot_seasonal_contribution(station, OPtype="Mass",
-                                       CHEMorOP="CHEM",ax=axes[i])    
-            axes[i].set_ylabel("Normalized contribution")
+            plot_seasonal_contribution(station, OPtype="Mass", CHEMorOP="CHEM",
+                                       normalize=normalize,
+                                       ax=axes[i])    
+            axes[i].set_ylabel("Normalized contribution" if normalize else
+                               "$µg.m^{-3}$")
             axes[i].legend("")
         else:
-            plot_seasonal_contribution(station, OPtype=plot,
-                                       CHEMorOP="OP",ax=axes[i])    
+            plot_seasonal_contribution(station, OPtype=plot, CHEMorOP="OP",
+                                       normalize=normalize,
+                                       ax=axes[i])    
+            if not normalize:
+                axes[i].set_ylabel("$nmol.min^{-1}.m^{-3}$")
         # if i==2:
         axes[i].legend("")
+        # axes[i].set_yticklabels("")
         axes[i].set_xlabel(" ")
 
-    plot_annual_contribution(station, ax=axes[-1])
-    axes[-1].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    if normalize:
+        plot_annual_contribution(station, list_OPtype, normalize=True,
+                                 ax=axes[-1])
+        axes[-1].set_yticklabels("")
+    handles, labels = axes[-1].get_legend_handles_labels()
+    axes[-1].legend(handles[::-1], labels[::-1], loc='center left', bbox_to_anchor=(1, 0.5))
     axes[-1].set_xlabel(" ")
+    if not normalize:
+        plt.subplots_adjust(wspace=0.3)
 
 def plot_residualvsobs(station, OPtype=None, **kwarg):
 
@@ -811,24 +826,45 @@ def plot_residualvsobs(station, OPtype=None, **kwarg):
                  **kwarg)
     g.plot_marginals(sns.distplot, kde=False, **kwarg)
     g.ax_marg_x.remove()
-    g.ax_joint.set_ylabel("Obs. - Model [nmol/min/m$^3$]")
+    g.ax_joint.set_ylabel("Obs. - Model (nmol/min/m$^3$)")
     g.ax_joint.plot([0,g.ax_joint.axis()[1]], [0,0], "--k")
     g.ax_joint.set_title(OPtype)
-    g.ax_joint.set_xlabel("Obs. [nmol/min/m$^3$]")
+    g.ax_joint.set_xlabel("Obs. (nmol/min/m$^3$)")
     return g
 
-def print_correlation_obs_predicted(sto, list_station, list_OPtype):
+def print_correlation_obs_predicted(sto, list_OPtype):
     """
     Output a latex table for the correlation coefficient and regresion line
     between OP and predicted.
     """
+    import statsmodels.api as sm
+    from statsmodels.tools.tools import add_constant
+    list_station = sto.keys()
     print("\\toprule\nOP & Station & $ax+b$ & $r^2$ & \\OP{{}} range \\\\")
     for OPtype in list_OPtype:
         print("\\midrule\n\\multirow{{{}}}{{*}}{{\\{}}}".format(len(list_station),OPtype))
         for name in list_station:
-            s = sto[OPtype][name]
-            print(" & {:8} & ${:4.2f}x{:+3.2f}$ & {:3.2f} & {:3.2f} to {:3.2f}\\\\".format(s.name, s.p[0],s.p[1], s.pearson_r[0,1],
-                                       s.OP.min(), s.OP.max()))
+            s = sto[name]
+            if s.OPmodel.empty:
+                continue
+            print(name)
+            x = s.OP[OPtype].dropna()
+            y = add_constant(s.OPmodel[OPtype].dropna())
+            idx = x.index.intersection(y.index)
+            x = x.loc[idx]
+            y = y.loc[idx]
+            # print(idx)
+            # print(x)
+            # print(y)
+            df = pd.DataFrame(data={"x":x.index, "y":y.index})
+            # print(df)
+            reg=sm.OLS(exog=x, endog=y).fit()
+            print(s.OP[OPtype].max())
+            print(" & {:8} & ${:4.2f}x{:+3.2f}$ & {:3.2f} & {:3.2f} to {:3.2f}\\\\".format(
+                    name, reg.params[1], reg.params[0],
+                    s.reg[OPtype].rsquared,
+                    s.OP[OPtype].min(), s.OP[OPtype].max())
+            )
     print("\\bottomrule")
 
 def print_coeff(sto, list_station, list_OPtype):
